@@ -15,12 +15,19 @@ import { ANIMATION_CONFIG } from "@/config/animation";
 import { getTwistAmount } from "@/utils/animationHelpers";
 import { generateUnitPositions, toSceneUnits } from "@/utils/geometryHelpers";
 import { useScrollStore } from "@/store/scrollStore";
+import { useRibbonConfigStore } from "@/store/ribbonConfigStore";
 import ribbonVertexShader from "@/shaders/ribbonVertex.glsl";
 import ribbonFragmentShader from "@/shaders/ribbonFragment.glsl";
 
 const RibbonInstances = () => {
   const meshRef = useRef<InstancedMesh>(null);
   const scrollProgress = useScrollStore((state) => state.progress);
+  const twistAngleAtRest = useRibbonConfigStore(
+    (state) => state.twistAngleAtRest,
+  );
+  const twistAngleAtMax = useRibbonConfigStore(
+    (state) => state.twistAngleAtMax,
+  );
   const positions = useMemo(() => generateUnitPositions(), []);
 
   const material = useMemo(
@@ -30,7 +37,13 @@ const RibbonInstances = () => {
           uColor: { value: new Color(ANIMATION_CONFIG.ribbon.color) },
           uOpacity: { value: ANIMATION_CONFIG.ribbon.opacity },
           uHeight: { value: toSceneUnits(ANIMATION_CONFIG.ribbon.height) },
-          uMaxTwistAngle: { value: ANIMATION_CONFIG.ribbon.maxTwistAngle },
+          uTwistAngleAtRest: {
+            value: useRibbonConfigStore.getState().twistAngleAtRest,
+          },
+          uTwistAngleAtMax: {
+            value: useRibbonConfigStore.getState().twistAngleAtMax,
+          },
+          uBendAmount: { value: 0 },
         },
         transparent: true,
         depthWrite: false,
@@ -106,6 +119,8 @@ const RibbonInstances = () => {
     }
 
     attribute.needsUpdate = true;
+    material.uniforms.uTwistAngleAtRest.value = twistAngleAtRest;
+    material.uniforms.uTwistAngleAtMax.value = twistAngleAtMax;
   });
 
   return (

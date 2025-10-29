@@ -12,7 +12,6 @@ import {
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import {
-  BasicDepthPacking,
   BoxGeometry,
   CameraHelper,
   Color,
@@ -23,6 +22,7 @@ import {
   MeshDistanceMaterial,
   MeshDepthMaterial,
   MeshStandardMaterial,
+  PlaneGeometry,
   Quaternion,
   RGBADepthPacking,
   ShaderMaterial,
@@ -32,12 +32,17 @@ import {
 import { GUI } from "lil-gui";
 import { useScrollStore } from "@/store/scrollStore";
 import { useBladeConfigStore } from "@/store/bladeConfigStore";
+import { useRibbonConfigStore } from "@/store/ribbonConfigStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { toSceneUnits } from "@/utils/geometryHelpers";
-import bladeFragmentShader from "@/shaders/bladeFragment.glsl";
 import bladeDebugVertexShader from "@/shaders/bladeDebugVertex.glsl";
+import bladeFragmentShader from "@/shaders/bladeFragment.glsl";
+import ribbonVertexShader from "@/shaders/ribbonVertex.glsl";
+import ribbonFragmentShader from "@/shaders/ribbonFragment.glsl";
 
 const clamp01 = (value: number) => Math.min(Math.max(value, 0), 1);
+const degToRad = (value: number) => (value * Math.PI) / 180;
+const radToDeg = (value: number) => (value * 180) / Math.PI;
 
 const USE_CUSTOM_SHADOW = true;
 const SHOW_SHADOW_CAMERA_HELPER = false;
@@ -111,7 +116,6 @@ const SingleBlade = ({ bendAmountRef, bladeThickness }: SingleBladeProps) => {
   const materialRef = useRef<ShaderMaterial | null>(null);
   const depthMaterialRef = useRef<MeshDepthMaterial | null>(null);
   const distanceMaterialRef = useRef<MeshDistanceMaterial | null>(null);
-  const depthShaderRef = useRef<Shader | null>(null);
   const bendChunk = useMemo(
     () =>
       `
@@ -227,7 +231,7 @@ ${bendChunkForShader}
     };
   }, [depthMaterial, distanceMaterial, material]);
 
-  useFrame((state, delta) => {
+  useFrame(() => {
     const progress = clamp01(scrollProgress);
     const normalized =
       progress <= 0.5 ? progress / 0.5 : 1 - (progress - 0.5) / 0.5;
@@ -325,6 +329,241 @@ const DebugWire = ({ bendAmountRef, wireThicknessRef }: DebugWireProps) => {
   );
 };
 
+type DebugRibbonProps = {
+  bendAmountRef: MutableRefObject<number>;
+};
+
+const DebugRibbon = ({ bendAmountRef }: DebugRibbonProps) => {
+  const meshRef = useRef<Mesh>(null);
+  const materialRef = useRef<ShaderMaterial | null>(null);
+  const depthMaterialRef = useRef<MeshDepthMaterial | null>(null);
+  const distanceMaterialRef = useRef<MeshDistanceMaterial | null>(null);
+  const anchorScene = useMemo(
+    () => new Vector3(0, 0, toSceneUnits(ANIMATION_CONFIG.ribbon.anchorDistance)),
+    [],
+  );
+  const up = useMemo(() => new Vector3(0, 1, 0), []);
+  const tempEnd = useMemo(() => new Vector3(), []);
+  const tempDir = useMemo(() => new Vector3(), []);
+  const tempMid = useMemo(() => new Vector3(), []);
+  const tempQuat = useMemo(() => new Quaternion(), []);
+  const baseHeightScene = useMemo(
+    () => toSceneUnits(ANIMATION_CONFIG.ribbon.height),
+    [],
+  );
+  const twistChunk = useMemo(
+    () =>
+      `
+        float bendAmount = clamp(uBendAmount, 0.0, 1.0);
+        float normalizedY = clamp((twistPos.y + (uHeight * 0.5)) / uHeight, 0.0, 1.0);
+        float rootAngle = mix(uTwistAngleAtRest, uTwistAngleAtMax, bendAmount);
+        float twistAngle = rootAngle * (1.0 - normalizedY);
+        float cosTheta = cos(twistAngle);
+        float sinTheta = sin(twistAngle);
+        float x = twistPos.x * cosTheta - twistPos.z * sinTheta;
+        float z = twistPos.x * sinTheta + twistPos.z * cosTheta;
+        twistPos.x = x;
+        twistPos.z = z;
+      `,
+    [],
+  );
+  const geometry = useMemo(
+    () =>
+      new PlaneGeometry(
+        toSceneUnits(ANIMATION_CONFIG.ribbon.width),
+        toSceneUnits(ANIMATION_CONFIG.ribbon.height),
+        1,
+        ANIMATION_CONFIG.ribbon.heightSegments,
+      ),
+    [],
+  );
+  const material = useMemo(
+    () =>
+      new ShaderMaterial({
+        uniforms: {
+          uColor: { value: new Color(ANIMATION_CONFIG.ribbon.color) },
+          uOpacity: { value: ANIMATION_CONFIG.ribbon.opacity },
+          uHeight: { value: toSceneUnits(ANIMATION_CONFIG.ribbon.height) },
+          uTwistAngleAtRest: {
+            value: useRibbonConfigStore.getState().twistAngleAtRest,
+          },
+          uTwistAngleAtMax: {
+            value: useRibbonConfigStore.getState().twistAngleAtMax,
+          },
+          uBendAmount: { value: 0 },
+        },
+        transparent: true,
+        depthWrite: false,
+        vertexShader: ribbonVertexShader,
+        fragmentShader: ribbonFragmentShader,
+        side: DoubleSide,
+      }),
+    [],
+  );
+  const sharedUniformsRef = useRef(material.uniforms);
+  const applyTwistToShader = useCallback(
+    (shader: Shader) => {
+      const sharedUniforms = sharedUniformsRef.current;
+
+      shader.uniforms.uHeight = sharedUniforms.uHeight;
+      shader.uniforms.uTwistAngleAtRest = sharedUniforms.uTwistAngleAtRest;
+      shader.uniforms.uTwistAngleAtMax = sharedUniforms.uTwistAngleAtMax;
+      shader.uniforms.uBendAmount = sharedUniforms.uBendAmount;
+
+      shader.vertexShader = shader.vertexShader.replace(
+        /#include\s*<common>/,
+        `#include <common>
+uniform float uHeight;
+uniform float uTwistAngleAtRest;
+uniform float uTwistAngleAtMax;
+uniform float uBendAmount;`,
+      );
+
+      const twistBlock = `
+      {
+        vec3 twistPos = transformed;
+${twistChunk}
+        transformed = twistPos;
+      }
+      `;
+
+      shader.vertexShader = shader.vertexShader.replace(
+        /#include\s*<project_vertex>/,
+        `${twistBlock}
+#include <project_vertex>`,
+      );
+    },
+    [twistChunk],
+  );
+
+  useEffect(
+    () => () => {
+      geometry.dispose();
+    },
+    [geometry],
+  );
+
+  useLayoutEffect(() => {
+    geometry.rotateY(Math.PI);
+  }, [geometry]);
+
+  const depthMaterial = useMemo(() => {
+    if (!USE_CUSTOM_SHADOW) return null;
+    const mat = new MeshDepthMaterial({
+      side: DoubleSide,
+      depthPacking: RGBADepthPacking,
+    });
+    mat.onBeforeCompile = applyTwistToShader;
+    return mat;
+  }, [applyTwistToShader]);
+
+  const distanceMaterial = useMemo(() => {
+    if (!USE_CUSTOM_SHADOW) return null;
+    const mat = new MeshDistanceMaterial({ side: DoubleSide });
+    mat.onBeforeCompile = applyTwistToShader;
+    return mat;
+  }, [applyTwistToShader]);
+
+  useLayoutEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) {
+      return;
+    }
+
+    materialRef.current = material;
+    depthMaterialRef.current = depthMaterial;
+    distanceMaterialRef.current = distanceMaterial;
+    mesh.customDepthMaterial = depthMaterial ?? undefined;
+    mesh.customDistanceMaterial = distanceMaterial ?? undefined;
+
+    return () => {
+      mesh.customDepthMaterial = undefined;
+      mesh.customDistanceMaterial = undefined;
+      depthMaterialRef.current = null;
+      distanceMaterialRef.current = null;
+    };
+  }, [depthMaterial, distanceMaterial, material]);
+
+  useLayoutEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) {
+      return;
+    }
+    mesh.position.copy(anchorScene);
+  }, [anchorScene]);
+
+  const twistAngleAtRest = useRibbonConfigStore(
+    (state) => state.twistAngleAtRest,
+  );
+  const twistAngleAtMax = useRibbonConfigStore(
+    (state) => state.twistAngleAtMax,
+  );
+
+  useFrame(() => {
+    const uniforms = sharedUniformsRef.current;
+    const mesh = meshRef.current;
+    if (!uniforms || !mesh) {
+      return;
+    }
+
+    uniforms.uBendAmount.value = clamp01(bendAmountRef.current);
+    uniforms.uTwistAngleAtRest.value = twistAngleAtRest;
+    uniforms.uTwistAngleAtMax.value = twistAngleAtMax;
+
+    const bendAmount = clamp01(bendAmountRef.current);
+    const tipPoint = computeBladePointMM(bendAmount, 1);
+    tempEnd.set(0, toSceneUnits(tipPoint.y), toSceneUnits(tipPoint.z));
+    tempDir.copy(tempEnd).sub(anchorScene);
+
+    const length = tempDir.length();
+    if (length <= 1e-6) {
+      mesh.visible = false;
+      return;
+    }
+
+    mesh.visible = true;
+    tempMid.copy(anchorScene).add(tempEnd).multiplyScalar(0.5);
+    tempQuat.setFromUnitVectors(up, tempDir.normalize());
+
+    mesh.position.copy(tempMid);
+    mesh.quaternion.copy(tempQuat);
+    const scaleY = Math.max(length / baseHeightScene, 1e-4);
+    mesh.scale.set(1, scaleY, 1);
+
+    if (materialRef.current) {
+      materialRef.current.uniformsNeedUpdate = true;
+    }
+  });
+
+  useEffect(
+    () => () => {
+      if (materialRef.current) {
+        materialRef.current.dispose();
+        materialRef.current = null;
+      }
+      if (depthMaterialRef.current) {
+        depthMaterialRef.current.dispose();
+        depthMaterialRef.current = null;
+      }
+      if (distanceMaterialRef.current) {
+        distanceMaterialRef.current.dispose();
+        distanceMaterialRef.current = null;
+      }
+    },
+    [],
+  );
+
+  return (
+    <mesh
+      ref={meshRef}
+      geometry={geometry}
+      material={material}
+      castShadow
+      receiveShadow
+    />
+  );
+};
+
 const Ground = () => (
   <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
     <planeGeometry args={[10, 10]} />
@@ -379,13 +618,29 @@ const BladeDebugScene = () => {
   const setBladeThickness = useBladeConfigStore(
     (state) => state.setBladeThickness,
   );
+  const twistAngleAtRest = useRibbonConfigStore(
+    (state) => state.twistAngleAtRest,
+  );
+  const twistAngleAtMax = useRibbonConfigStore(
+    (state) => state.twistAngleAtMax,
+  );
+  const setTwistAngleAtRest = useRibbonConfigStore(
+    (state) => state.setTwistAngleAtRest,
+  );
+  const setTwistAngleAtMax = useRibbonConfigStore(
+    (state) => state.setTwistAngleAtMax,
+  );
   const guiParamsRef = useRef({
     wireThickness: 10,
     bladeThickness: ANIMATION_CONFIG.blade.thickness,
+    ribbonRestAngleDeg: radToDeg(useRibbonConfigStore.getState().twistAngleAtRest),
+    ribbonMaxAngleDeg: radToDeg(useRibbonConfigStore.getState().twistAngleAtMax),
   });
   const guiControllersRef = useRef<{
     wireThickness?: DebugController;
     bladeThickness?: DebugController;
+    ribbonRestAngleDeg?: DebugController;
+    ribbonMaxAngleDeg?: DebugController;
   }>({});
   const guiRef = useRef<GUI | null>(null);
   const bladeHeight = toSceneUnits(ANIMATION_CONFIG.blade.height);
@@ -408,6 +663,12 @@ const BladeDebugScene = () => {
     const params = guiParamsRef.current;
     params.wireThickness = wireThicknessRef.current;
     params.bladeThickness = useBladeConfigStore.getState().bladeThickness;
+    params.ribbonRestAngleDeg = radToDeg(
+      useRibbonConfigStore.getState().twistAngleAtRest,
+    );
+    params.ribbonMaxAngleDeg = radToDeg(
+      useRibbonConfigStore.getState().twistAngleAtMax,
+    );
 
     const wireController = gui
       .add(params, "wireThickness", 0.5, 20, 0.1)
@@ -425,9 +686,27 @@ const BladeDebugScene = () => {
         setBladeThickness(value);
       });
 
+    const ribbonRestController = gui
+      .add(params, "ribbonRestAngleDeg", -180, 180, 0.5)
+      .name("Ribbon Twist (deg, rest)")
+      .onChange((value: number) => {
+        guiParamsRef.current.ribbonRestAngleDeg = value;
+        setTwistAngleAtRest(degToRad(value));
+      });
+
+    const ribbonMaxController = gui
+      .add(params, "ribbonMaxAngleDeg", -180, 360, 0.5)
+      .name("Ribbon Twist (deg, max)")
+      .onChange((value: number) => {
+        guiParamsRef.current.ribbonMaxAngleDeg = value;
+        setTwistAngleAtMax(degToRad(value));
+      });
+
     guiControllersRef.current = {
       wireThickness: wireController,
       bladeThickness: bladeController,
+      ribbonRestAngleDeg: ribbonRestController,
+      ribbonMaxAngleDeg: ribbonMaxController,
     };
 
     gui.domElement.style.zIndex = "20";
@@ -437,7 +716,7 @@ const BladeDebugScene = () => {
       gui.destroy();
       guiRef.current = null;
     };
-  }, [setBladeThickness]);
+  }, [setBladeThickness, setTwistAngleAtRest, setTwistAngleAtMax]);
 
   useEffect(() => {
     guiParamsRef.current.bladeThickness = bladeThickness;
@@ -446,6 +725,22 @@ const BladeDebugScene = () => {
       controller.updateDisplay();
     }
   }, [bladeThickness]);
+
+  useEffect(() => {
+    guiParamsRef.current.ribbonRestAngleDeg = radToDeg(twistAngleAtRest);
+    const controller = guiControllersRef.current.ribbonRestAngleDeg;
+    if (controller && typeof controller.updateDisplay === "function") {
+      controller.updateDisplay();
+    }
+  }, [twistAngleAtRest]);
+
+  useEffect(() => {
+    guiParamsRef.current.ribbonMaxAngleDeg = radToDeg(twistAngleAtMax);
+    const controller = guiControllersRef.current.ribbonMaxAngleDeg;
+    if (controller && typeof controller.updateDisplay === "function") {
+      controller.updateDisplay();
+    }
+  }, [twistAngleAtMax]);
 
   return (
     <Canvas
@@ -494,6 +789,7 @@ const BladeDebugScene = () => {
           bendAmountRef={bendAmountRef}
           bladeThickness={bladeThickness}
         />
+        <DebugRibbon bendAmountRef={bendAmountRef} />
         <DebugWire
           bendAmountRef={bendAmountRef}
           wireThicknessRef={wireThicknessRef}

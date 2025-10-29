@@ -1,16 +1,24 @@
 uniform float uHeight;
-uniform float uMaxTwistAngle;
+uniform float uTwistAngleAtRest;
+uniform float uTwistAngleAtMax;
+uniform float uBendAmount;
 
+#ifdef USE_INSTANCING
 attribute float aTwistAmount;
+#endif
 
 varying vec2 vUv;
 
 void main() {
   vUv = uv;
 
-  float twistAmount = clamp(aTwistAmount, 0.0, 1.0);
+  float bendAmount = clamp(uBendAmount, 0.0, 1.0);
+#ifdef USE_INSTANCING
+  bendAmount = clamp(aTwistAmount, 0.0, 1.0);
+#endif
   float normalizedY = clamp((position.y + (uHeight * 0.5)) / uHeight, 0.0, 1.0);
-  float twistAngle = uMaxTwistAngle * twistAmount * (1.0 - normalizedY);
+  float rootAngle = mix(uTwistAngleAtRest, uTwistAngleAtMax, bendAmount);
+  float twistAngle = rootAngle * (1.0 - normalizedY);
 
   float cosTheta = cos(twistAngle);
   float sinTheta = sin(twistAngle);

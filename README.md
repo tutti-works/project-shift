@@ -107,16 +107,21 @@ npm run lint
 - [x] **シャドウカメラヘルパー実装（デバッグ・最適化用）**
 - [x] レスポンシブ対応の基本実装
 
-### 🔄 進行中・調整が必要な項目
+### ✅ 最近完了した項目
 
-#### 1. **リボンのデバッグモード実装**（次のステップ）
-   - **計画**: [docs/ribbon-implementation.md](docs/ribbon-implementation.md) に詳細記載
+#### 1. **リボンのデバッグモード実装** ✅ **完了**
    - **実装内容**:
-     - グラデーション状のねじれ（根本で最大、先端で0）
-     - GUIによるインタラクティブ制御（基準角度・最大角度）
-     - スクロール連動と影の同期
+     - グラデーション状のねじれ（根本で最大、先端で0） ✅
+     - GUIによるインタラクティブ制御（基準角度・最大角度） ✅
+     - スクロール連動と影の同期 ✅
+     - カスタムDepth/DistanceMaterialによる影の変形連動 ✅
+   - **調整可能なパラメータ（デバッグGUI）**:
+     - Ribbon Twist (deg, rest): リボンの静止時ねじれ角度（-180〜180度）
+     - Ribbon Twist (deg, max): リボンの最大曲げ時ねじれ角度（-180〜360度）
    - **ファイル**: [src/components/BladeDebugScene.tsx](src/components/BladeDebugScene.tsx)
-   - **参考**: カスタムシャドウパターン [docs/shadow-issue.md](docs/shadow-issue.md)
+   - **参考**: [docs/ribbon-implementation.md](docs/ribbon-implementation.md) | [docs/shadow-issue.md](docs/shadow-issue.md)
+
+### 🔄 進行中・調整が必要な項目
 
 #### 2. **シェーダーロジックの拡張**
    - **現状**: 羽板のしなりが全ユニット一律で動作（中央の26本目の値を使用）
@@ -284,5 +289,5 @@ Three.jsのカスタム頂点シェーダーを使用する際、影を変形に
 
 ---
 
-**開発状況**: Phase 1 進行中（カスタムシャドウ実装完了）
+**開発状況**: Phase 1 完了（1本のユニットのデバッグモード実装完了）| Phase 2 準備中（51本への拡張）
 **最終更新**: 2025年10月30日

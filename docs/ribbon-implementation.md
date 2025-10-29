@@ -512,23 +512,23 @@ export const ANIMATION_CONFIG = {
 
 ## 📝 実装の優先順位
 
-### Phase 1: 基本実装（最優先）
-1. Zustand store作成（ribbonConfigStore.ts）
-2. GUI拡張（ribbonBaseTwist, ribbonMaxTwist）
-3. DebugRibbonコンポーネント作成
-4. リボン用シェーダー実装
+### Phase 1: 基本実装（最優先） ✅ **完了**
+1. Zustand store作成（ribbonConfigStore.ts） ✅
+2. GUI拡張（ribbonBaseTwist, ribbonMaxTwist） ✅
+3. DebugRibbonコンポーネント作成 ✅
+4. リボン用シェーダー実装 ✅
 
-### Phase 2: 影の実装
-5. applyTwistToShader関数実装
-6. ribbonDepthMaterial作成
-7. ribbonDistanceMaterial作成
-8. メッシュへのカスタムマテリアル適用
+### Phase 2: 影の実装 ✅ **完了**
+5. applyTwistToShader関数実装 ✅
+6. ribbonDepthMaterial作成 ✅
+7. ribbonDistanceMaterial作成 ✅
+8. メッシュへのカスタムマテリアル適用 ✅
 
-### Phase 3: 調整と最適化
-9. パラメータの微調整
-10. シャドウカメラ範囲の最適化
-11. パフォーマンス確認
-12. ドキュメント更新
+### Phase 3: 調整と最適化 ✅ **完了**
+9. パラメータの微調整 ✅
+10. シャドウカメラ範囲の最適化 ✅
+11. パフォーマンス確認 ✅
+12. ドキュメント更新 ✅
 
 ---
 
@@ -562,5 +562,44 @@ export const ANIMATION_CONFIG = {
 
 ---
 
-**ステータス**: 計画完了、実装待ち
-**最終更新**: 2025-10-30
+## ✅ 実装完了
+
+### 達成事項
+
+1. **Zustand Store実装** ([src/store/ribbonConfigStore.ts](../src/store/ribbonConfigStore.ts))
+   - `twistAngleAtRest`: 静止時のねじれ角度
+   - `twistAngleAtMax`: 最大曲げ時のねじれ角度
+   - リアルタイム更新機能
+
+2. **DebugRibbonコンポーネント** ([src/components/BladeDebugScene.tsx:336-564](../src/components/BladeDebugScene.tsx#L336-L564))
+   - PlaneGeometryベースのリボンメッシュ
+   - 羽板の先端位置に追従する動的配置
+   - カスタムシェーダーによるねじれ変形
+
+3. **カスタムシェーダー実装** ([src/shaders/ribbonVertex.glsl](../src/shaders/ribbonVertex.glsl))
+   - グラデーション状のねじれ（根本で最大、先端で0）
+   - スクロール連動による動的変形
+   - 高さ方向のセグメント分割による滑らかな表現
+
+4. **カスタムシャドウマテリアル** ([src/components/BladeDebugScene.tsx:450-465](../src/components/BladeDebugScene.tsx#L450-L465))
+   - MeshDepthMaterial + RGBADepthPacking
+   - MeshDistanceMaterial
+   - onBeforeCompileによるシェーダー注入
+   - メインマテリアルとの uniform 共有
+
+5. **GUIコントロール** ([src/components/BladeDebugScene.tsx:689-703](../src/components/BladeDebugScene.tsx#L689-L703))
+   - Ribbon Twist (deg, rest): -180° 〜 180°
+   - Ribbon Twist (deg, max): -180° 〜 360°
+   - リアルタイムプレビュー機能
+
+### 技術的ハイライト
+
+- **ねじれのグラデーション計算**: `twistGradient = 1.0 - normalizedY` で根本から先端への自然な減衰
+- **スクロール連動**: `mix(twistAngleAtRest, twistAngleAtMax, bendAmount)` による補間
+- **影の変形連動**: カスタムDepth/DistanceMaterialによる高精度シャドウ
+- **動的配置**: 羽板の円弧に追従する位置・回転・スケール更新
+
+---
+
+**ステータス**: ✅ 実装完了（Phase 1プロトタイプ完了）
+**最終更新**: 2025年10月30日
