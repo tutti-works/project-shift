@@ -9,6 +9,7 @@
 - [技術仕様書](docs/technical-specification.md) - 実装の詳細設計
 - [アニメーション設定](docs/animation-config.md) - パラメータの調整方法
 - [カスタムシャドウ実装](docs/shadow-issue.md) - 影の変形連動実装とデバッグ記録
+- [リボン実装計画](docs/ribbon-implementation.md) - リボンのねじれ表現とデバッグモード
 
 ## 🛠 技術スタック
 
@@ -108,7 +109,16 @@ npm run lint
 
 ### 🔄 進行中・調整が必要な項目
 
-#### 1. **シェーダーロジックの拡張**
+#### 1. **リボンのデバッグモード実装**（次のステップ）
+   - **計画**: [docs/ribbon-implementation.md](docs/ribbon-implementation.md) に詳細記載
+   - **実装内容**:
+     - グラデーション状のねじれ（根本で最大、先端で0）
+     - GUIによるインタラクティブ制御（基準角度・最大角度）
+     - スクロール連動と影の同期
+   - **ファイル**: [src/components/BladeDebugScene.tsx](src/components/BladeDebugScene.tsx)
+   - **参考**: カスタムシャドウパターン [docs/shadow-issue.md](docs/shadow-issue.md)
+
+#### 2. **シェーダーロジックの拡張**
    - **現状**: 羽板のしなりが全ユニット一律で動作（中央の26本目の値を使用）
    - **必要な実装**: 各ユニットごとにしなり量を計算してシェーダーに渡す
    - **ファイル**: [src/components/BladeInstances.tsx](src/components/BladeInstances.tsx)
@@ -116,7 +126,7 @@ npm run lint
      - 現在は `getBendAmount(scrollProgress, centerIndex)` で中央のみ計算
      - 51本すべての `bendAmount` を計算し、InstancedMesh の attribute として渡す必要あり
 
-#### 2. **サイン波伝播アニメーション**
+#### 3. **サイン波伝播アニメーション**
    - **現状**: 基本的な計算関数は実装済み（`src/utils/animationHelpers.ts`）
    - **必要な実装**:
      - 各ユニットの `bendAmount` を個別に計算

@@ -40,7 +40,7 @@ import bladeDebugVertexShader from "@/shaders/bladeDebugVertex.glsl";
 const clamp01 = (value: number) => Math.min(Math.max(value, 0), 1);
 
 const USE_CUSTOM_SHADOW = true;
-const SHOW_SHADOW_CAMERA_HELPER = true;
+const SHOW_SHADOW_CAMERA_HELPER = false;
 
 type DebugController = ReturnType<GUI["add"]>;
 
