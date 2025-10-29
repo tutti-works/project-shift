@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(code --list-extensions:*)",
+      "Bash(node --version:*)",
+      "Bash(claude mcp add:*)",
+      "Bash(claude mcp list:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
