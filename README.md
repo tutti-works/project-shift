@@ -10,6 +10,7 @@
 - [アニメーション設定](docs/animation-config.md) - パラメータの調整方法
 - [カスタムシャドウ実装](docs/shadow-issue.md) - 影の変形連動実装とデバッグ記録
 - [リボン実装計画](docs/ribbon-implementation.md) - リボンのねじれ表現とデバッグモード
+- [羽板の陰影実装計画](docs/blade-shading.md) - 法線再計算とライティング実装計画
 
 ## 🛠 技術スタック
 
