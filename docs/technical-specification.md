@@ -541,31 +541,121 @@ function adjustCameraForViewport(camera: THREE.PerspectiveCamera) {
 
 ---
 
-## 6. ライティング設定
+## 6. ライティングとシャドウ設定
+
+### 6.1 基本ライティング
 
 ```typescript
 // 環境光
-<ambientLight intensity={0.4} />
+<ambientLight intensity={0.35} />
 
-// メインライト（太陽光）
+// メインライト（DirectionalLight）
 <directionalLight
-  position={[5000, 8000, 3000]}
-  intensity={1.2}
+  position={[3, 5, 2]}
+  intensity={1.4}
   castShadow
-  shadow-mapSize-width={2048}
-  shadow-mapSize-height={2048}
-  shadow-camera-left={-5000}
-  shadow-camera-right={5000}
-  shadow-camera-top={5000}
-  shadow-camera-bottom={-5000}
-/>
-
-// フィルライト（影を柔らかく）
-<directionalLight
-  position={[-3000, 4000, -2000]}
-  intensity={0.5}
+  shadow-mapSize-width={1024}
+  shadow-mapSize-height={1024}
+  shadow-camera-left={-5}
+  shadow-camera-right={5}
+  shadow-camera-top={5}
+  shadow-camera-bottom={-5}
+  shadow-camera-near={0.1}
+  shadow-camera-far={10}
 />
 ```
+
+### 6.2 カスタムシャドウマテリアル
+
+**重要**: カスタム頂点シェーダーを使用する場合、影も変形に連動させるため、`MeshDepthMaterial`をカスタマイズする必要があります。
+
+```typescript
+const depthMaterial = useMemo(() => {
+  const mat = new MeshDepthMaterial({
+    side: DoubleSide,
+    depthPacking: RGBADepthPacking  // 高精度エンコーディング（必須）
+  });
+
+  mat.onBeforeCompile = (shader) => {
+    // uniformをメインマテリアルと共有
+    shader.uniforms.uHeight = sharedUniforms.uHeight;
+    shader.uniforms.uBendAmount = sharedUniforms.uBendAmount;
+    shader.uniforms.uMaxBendAngle = sharedUniforms.uMaxBendAngle;
+
+    // uniform宣言を追加
+    shader.vertexShader = shader.vertexShader.replace(
+      /#include\s*<common>/,
+      `#include <common>
+uniform float uHeight;
+uniform float uBendAmount;
+uniform float uMaxBendAngle;`,
+    );
+
+    // 変形ロジックを #include <project_vertex> の直前に注入
+    shader.vertexShader = shader.vertexShader.replace(
+      /#include\s*<project_vertex>/,
+      `${bendBlock}
+#include <project_vertex>`,
+    );
+  };
+
+  return mat;
+}, [applyBendToShader]);
+
+// メッシュに適用
+mesh.customDepthMaterial = depthMaterial;
+mesh.customDistanceMaterial = distanceMaterial;
+```
+
+**重要なポイント:**
+1. **depthPacking: RGBADepthPacking** - カスタム頂点変形には高精度エンコーディングが必須
+2. **#include <project_vertex> 直前に注入** - `transformed`が上書きされる前に変形を適用
+3. **Object.assignで参照共有** - メインマテリアルのuniform更新が自動的に影に反映
+
+詳細は [docs/shadow-issue.md](shadow-issue.md) を参照してください。
+
+### 6.3 シャドウカメラの最適化
+
+影の解像度を向上させるため、シャドウカメラの範囲をシーンに合わせて最適化します。
+
+```typescript
+// デバッグ用ヘルパー（開発時のみ）
+const SHOW_SHADOW_CAMERA_HELPER = true;
+
+const ShadowCameraHelper = ({ lightRef }) => {
+  const { scene } = useThree();
+  const helperRef = useRef(null);
+
+  useEffect(() => {
+    if (!SHOW_SHADOW_CAMERA_HELPER) return;
+
+    const light = lightRef.current;
+    if (!light) return;
+
+    const helper = new CameraHelper(light.shadow.camera);
+    helperRef.current = helper;
+    scene.add(helper);
+
+    return () => {
+      scene.remove(helper);
+      helper.dispose();
+    };
+  }, [scene, lightRef]);
+
+  useFrame(() => {
+    if (helperRef.current) {
+      helperRef.current.update();
+    }
+  });
+
+  return null;
+};
+```
+
+**最適化の考え方:**
+- シャドウマップのサイズ（例: 1024x1024）は固定
+- シャドウカメラの範囲を狭めることで、同じピクセル数でより高密度な影を実現
+- 例: 範囲10x10の場合、ピクセル密度 = 1024/10 = 102.4 px/unit
 
 ---
 

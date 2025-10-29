@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import {
+  MutableRefObject,
   Suspense,
   useCallback,
   useEffect,
@@ -8,7 +9,7 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import {
   BasicDepthPacking,
@@ -39,7 +40,7 @@ import bladeDebugVertexShader from "@/shaders/bladeDebugVertex.glsl";
 const clamp01 = (value: number) => Math.min(Math.max(value, 0), 1);
 
 const USE_CUSTOM_SHADOW = true;
-const SHOW_SHADOW_CAMERA_HELPER = false;
+const SHOW_SHADOW_CAMERA_HELPER = true;
 
 type DebugController = ReturnType<GUI["add"]>;
 
@@ -331,6 +332,45 @@ const Ground = () => (
   </mesh>
 );
 
+type ShadowCameraHelperProps = {
+  lightRef: MutableRefObject<DirectionalLight | null>;
+};
+
+const ShadowCameraHelper = ({ lightRef }: ShadowCameraHelperProps) => {
+  const { scene } = useThree();
+  const helperRef = useRef<CameraHelper | null>(null);
+
+  useEffect(() => {
+    if (!SHOW_SHADOW_CAMERA_HELPER) {
+      return;
+    }
+
+    const light = lightRef.current;
+    if (!light) {
+      return;
+    }
+
+    const helper = new CameraHelper(light.shadow.camera);
+    helper.name = "shadow-camera-helper";
+    helperRef.current = helper;
+    scene.add(helper);
+
+    return () => {
+      scene.remove(helper);
+      helper.dispose();
+      helperRef.current = null;
+    };
+  }, [scene, lightRef]);
+
+  useFrame(() => {
+    if (helperRef.current) {
+      helperRef.current.update();
+    }
+  });
+
+  return null;
+};
+
 const BladeDebugScene = () => {
   const directionalLightRef = useRef<DirectionalLight | null>(null);
   const bendAmountRef = useRef<number>(0);
@@ -356,25 +396,6 @@ const BladeDebugScene = () => {
     [bladeHeight],
   );
 
-  useEffect(() => {
-    if (!SHOW_SHADOW_CAMERA_HELPER) {
-      return;
-    }
-
-    const light = directionalLightRef.current;
-    if (!light) {
-      return;
-    }
-
-    const helper = new CameraHelper(light.shadow.camera);
-    helper.name = "shadow-camera-helper";
-    light.add(helper);
-
-    return () => {
-      light.remove(helper);
-      helper.dispose();
-    };
-  }, []);
 
   useEffect(() => {
     if (guiRef.current) {
@@ -443,17 +464,18 @@ const BladeDebugScene = () => {
       <color attach="background" args={["#050505"]} />
       <ambientLight intensity={0.35} />
       <directionalLight
+        ref={directionalLightRef}
         position={[3, 5, 2]}
         intensity={1.4}
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
-        shadow-camera-left={-10}
-        shadow-camera-right={10}
-        shadow-camera-top={10}
-        shadow-camera-bottom={-10}
+        shadow-camera-left={-5}
+        shadow-camera-right={5}
+        shadow-camera-top={5}
+        shadow-camera-bottom={-5}
         shadow-camera-near={0.1}
-        shadow-camera-far={50}
+        shadow-camera-far={10}
       />
 
       <OrbitControls
@@ -464,6 +486,8 @@ const BladeDebugScene = () => {
         maxPolarAngle={Math.PI * 0.9}
         minPolarAngle={0}
       />
+
+      <ShadowCameraHelper lightRef={directionalLightRef} />
 
       <Suspense fallback={null}>
         <SingleBlade
