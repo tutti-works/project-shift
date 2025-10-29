@@ -1,7 +1,13 @@
 ﻿"use client";
 
-import type { MutableRefObject } from "react";
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import {
@@ -30,7 +36,7 @@ import bladeDebugVertexShader from "@/shaders/bladeDebugVertex.glsl";
 
 const clamp01 = (value: number) => Math.min(Math.max(value, 0), 1);
 
-const USE_CUSTOM_SHADOW = false;
+const USE_CUSTOM_SHADOW = true;
 const SHOW_SHADOW_CAMERA_HELPER = false;
 
 type DebugController = ReturnType<GUI["add"]>;
@@ -144,96 +150,44 @@ const SingleBlade = ({ bendAmountRef, bladeThickness }: SingleBladeProps) => {
   );
   const sharedUniformsRef = useRef(material.uniforms);
 
-  const depthMaterial = useMemo(() => {
-    if (!USE_CUSTOM_SHADOW) {
-      return null;
-    }
-    const mat = new MeshDepthMaterial({ side: DoubleSide });
-    mat.onBeforeCompile = (shader) => {
+  const applyBendToShader = useCallback(
+    (shader: Shader) => {
+      console.log("Custom shadow onBeforeCompile triggered.");
       const sharedUniforms = sharedUniformsRef.current;
-      console.log('🔍 [DEPTH] onBeforeCompile called');
-      console.log('🔍 [DEPTH] Shader uniforms before:', Object.keys(shader.uniforms));
-      console.log('🔍 [DEPTH] sharedUniforms', {
-        uHeight: sharedUniforms.uHeight.value,
-        uBendAmount: sharedUniforms.uBendAmount.value,
-        uMaxBendAngle: sharedUniforms.uMaxBendAngle.value,
-      });
 
-      // Object.assignを使用して既存のuniformsオブジェクトに追加（参照を維持）
-      Object.assign(shader.uniforms, {
-        uHeight: sharedUniforms.uHeight,
-        uBendAmount: sharedUniforms.uBendAmount,
-        uMaxBendAngle: sharedUniforms.uMaxBendAngle,
-      });
-
-      const referenceMatch = shader.uniforms.uBendAmount === sharedUniforms.uBendAmount;
-      console.log('🔗 [UNIFORM] uBendAmount reference match', { referenceMatch });
-      console.log('🔗 [UNIFORM] uBendAmount initial value', shader.uniforms.uBendAmount.value);
+      shader.uniforms.uHeight = sharedUniforms.uHeight;
+      shader.uniforms.uBendAmount = sharedUniforms.uBendAmount;
+      shader.uniforms.uMaxBendAngle = sharedUniforms.uMaxBendAngle;
 
       shader.vertexShader = shader.vertexShader.replace(
-        "#include <common>",
-        `#include <common>\nuniform float uHeight;\nuniform float uBendAmount;\nuniform float uMaxBendAngle;\n`,
+        /vec3\s+transformed\s*=\s*vec3\s*\(\s*position\s*\);\s*/,
+        `vec3 transformed = vec3( position );
+        {
+          vec3 bendPos = transformed;
+          ${bendChunk.replace(/transformed/g, "bendPos")}
+          transformed = bendPos;
+        }`,
       );
-      shader.vertexShader = shader.vertexShader.replace(
-        "#include <begin_vertex>",
-        `#include <begin_vertex>\n${bendChunk}`,
-      );
+      console.log(shader.vertexShader.includes("vec3 bendPos"));
+    },
+    [bendChunk],
+  );
 
-      // シェーダーコードを詳細に確認
-      const validation = {
-        hasUniformDeclarations: shader.vertexShader.includes('uniform float uBendAmount'),
-        hasBendChunk: shader.vertexShader.includes('float bendAmount = clamp(uBendAmount'),
-        hasTransformed: shader.vertexShader.includes('transformed.y'),
-        includesBeginVertex: shader.vertexShader.includes('#include <begin_vertex>'),
-        shaderLength: shader.vertexShader.length,
-      };
-
-      console.log('📝 [SHADER] Validation result', validation);
-      console.log('📝 [SHADER] Modified vertex shader', shader.vertexShader.substring(0, 500) + '...');
-
-      // shaderオブジェクトをrefに保存
-      depthShaderRef.current = shader;
-    };
+  const depthMaterial = useMemo(() => {
+    if (!USE_CUSTOM_SHADOW) return null;
+    const mat = new MeshDepthMaterial({ side: DoubleSide });
+    mat.onBeforeCompile = applyBendToShader;
+    mat.customProgramCacheKey = () => "blade-depth-bend";
     return mat;
-  }, [bendChunk]);
+  }, [applyBendToShader]);
 
   const distanceMaterial = useMemo(() => {
-    if (!USE_CUSTOM_SHADOW) {
-      return null;
-    }
+    if (!USE_CUSTOM_SHADOW) return null;
     const mat = new MeshDistanceMaterial({ side: DoubleSide });
-    mat.onBeforeCompile = (shader) => {
-      const sharedUniforms = sharedUniformsRef.current;
-      console.log('🔍 [DISTANCE] onBeforeCompile called');
-      console.log('📦 [DISTANCE] Shader uniforms before:', Object.keys(shader.uniforms));
-
-      // Object.assignを使用して既存のuniformsオブジェクトに追加（参照を維持）
-      Object.assign(shader.uniforms, {
-        uHeight: sharedUniforms.uHeight,
-        uBendAmount: sharedUniforms.uBendAmount,
-        uMaxBendAngle: sharedUniforms.uMaxBendAngle,
-      });
-
-      console.log('📦 [DISTANCE] Shader uniforms after:', Object.keys(shader.uniforms));
-      console.log('🔗 [DISTANCE] uBendAmount reference match:',
-        shader.uniforms.uBendAmount === sharedUniforms.uBendAmount
-      );
-
-      shader.vertexShader = shader.vertexShader.replace(
-        "#include <common>",
-        `#include <common>\nuniform float uHeight;\nuniform float uBendAmount;\nuniform float uMaxBendAngle;\n`,
-      );
-      shader.vertexShader = shader.vertexShader.replace(
-        "#include <begin_vertex>",
-        `#include <begin_vertex>\n${bendChunk}`,
-      );
-
-      console.log('📝 [DISTANCE] Modified vertex shader:\n', shader.vertexShader);
-
-      // updateBend関数は不要（sharedUniformsを直接参照しているため）
-    };
+    mat.onBeforeCompile = applyBendToShader;
+    mat.customProgramCacheKey = () => "blade-distance-bend";
     return mat;
-  }, [bendChunk]);
+  }, [applyBendToShader]);
 
   const scrollProgress = useScrollStore((state) => state.progress);
   useLayoutEffect(() => {
@@ -245,6 +199,7 @@ const SingleBlade = ({ bendAmountRef, bladeThickness }: SingleBladeProps) => {
     materialRef.current = material;
     depthMaterialRef.current = depthMaterial;
     distanceMaterialRef.current = distanceMaterial;
+    console.log("Assigning customDepthMaterial:", depthMaterial);
     mesh.customDepthMaterial = depthMaterial ?? undefined;
     mesh.customDistanceMaterial = distanceMaterial ?? undefined;
 
@@ -262,36 +217,9 @@ const SingleBlade = ({ bendAmountRef, bladeThickness }: SingleBladeProps) => {
       progress <= 0.5 ? progress / 0.5 : 1 - (progress - 0.5) / 0.5;
     const eased = 0.5 - 0.5 * Math.cos(Math.PI * clamp01(normalized));
 
-    // メインマテリアルのuniformを更新
-    const bladeMaterial = materialRef.current;
-    if (bladeMaterial) {
-      // デバッグ: 5秒ごとに1回だけログ出力
-      if (Math.floor(state.clock.elapsedTime) % 5 === 0 && delta < 0.1) {
-        const sharedUniforms = sharedUniformsRef.current;
-        console.log('📊 [FRAME] Update:', {
-          progress,
-          eased,
-          mainBendAmount: bladeMaterial.uniforms.uBendAmount.value,
-          sharedBendAmount: sharedUniforms.uBendAmount.value,
-          referenceMatch: bladeMaterial.uniforms.uBendAmount === sharedUniforms.uBendAmount,
-        });
-      }
-
-      bladeMaterial.uniforms.uBendAmount.value = eased;
-      bladeMaterial.uniformsNeedUpdate = true;
-    }
-
-    // depthShaderのuniformsを直接確認
-    const depthShader = depthShaderRef.current;
-    if (depthShader && depthShader.uniforms.uBendAmount) {
-      // 5秒ごとにdepthShaderのuniform値をログ出力
-      if (Math.floor(state.clock.elapsedTime) % 5 === 0 && delta < 0.1) {
-        console.log('🔧 [DEPTH SHADER] Uniform value:', {
-          depthShaderBendAmount: depthShader.uniforms.uBendAmount.value,
-          eased: eased,
-          match: depthShader.uniforms.uBendAmount.value === eased,
-        });
-      }
+    sharedUniformsRef.current.uBendAmount.value = eased;
+    if (materialRef.current) {
+      materialRef.current.uniformsNeedUpdate = true;
     }
 
     bendAmountRef.current = eased;
