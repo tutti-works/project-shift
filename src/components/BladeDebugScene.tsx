@@ -11,6 +11,7 @@ import {
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import {
+  BasicDepthPacking,
   BoxGeometry,
   CameraHelper,
   Color,
@@ -22,6 +23,7 @@ import {
   MeshDepthMaterial,
   MeshStandardMaterial,
   Quaternion,
+  RGBADepthPacking,
   ShaderMaterial,
   Shader,
   Vector3,
@@ -166,29 +168,33 @@ uniform float uBendAmount;
 uniform float uMaxBendAngle;`,
     );
 
+    const bendChunkForShader = bendChunk.replace(/transformed/g, "bendPos");
     const bendBlock = `
       {
         vec3 bendPos = transformed;
-${bendChunk.replace(/transformed/g, "bendPos")}
+${bendChunkForShader}
         transformed = bendPos;
       }
     `;
 
     shader.vertexShader = shader.vertexShader.replace(
-      /#include\s*<begin_vertex>/,
-      `#include <begin_vertex>\n${bendBlock}`,
+      /#include\s*<project_vertex>/,
+      `${bendBlock}
+#include <project_vertex>`,
     );
 
-    console.log(shader.vertexShader.includes("bendPos"));
+    console.log('✅ [SHADER] Bend applied to shadow shader');
   },
   [bendChunk],
 );
 
   const depthMaterial = useMemo(() => {
     if (!USE_CUSTOM_SHADOW) return null;
-    const mat = new MeshDepthMaterial({ side: DoubleSide });
+    const mat = new MeshDepthMaterial({
+      side: DoubleSide,
+      depthPacking: RGBADepthPacking
+    });
     mat.onBeforeCompile = applyBendToShader;
-    mat.customProgramCacheKey = () => "blade-depth-bend";
     return mat;
   }, [applyBendToShader]);
 
@@ -196,7 +202,6 @@ ${bendChunk.replace(/transformed/g, "bendPos")}
     if (!USE_CUSTOM_SHADOW) return null;
     const mat = new MeshDistanceMaterial({ side: DoubleSide });
     mat.onBeforeCompile = applyBendToShader;
-    mat.customProgramCacheKey = () => "blade-distance-bend";
     return mat;
   }, [applyBendToShader]);
 
@@ -210,7 +215,6 @@ ${bendChunk.replace(/transformed/g, "bendPos")}
     materialRef.current = material;
     depthMaterialRef.current = depthMaterial;
     distanceMaterialRef.current = distanceMaterial;
-    console.log("Assigning customDepthMaterial:", depthMaterial);
     mesh.customDepthMaterial = depthMaterial ?? undefined;
     mesh.customDistanceMaterial = distanceMaterial ?? undefined;
 
@@ -444,12 +448,12 @@ const BladeDebugScene = () => {
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
-        shadow-camera-left={-5}
-        shadow-camera-right={5}
-        shadow-camera-top={5}
-        shadow-camera-bottom={-5}
+        shadow-camera-left={-10}
+        shadow-camera-right={10}
+        shadow-camera-top={10}
+        shadow-camera-bottom={-10}
         shadow-camera-near={0.1}
-        shadow-camera-far={20}
+        shadow-camera-far={50}
       />
 
       <OrbitControls
