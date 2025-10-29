@@ -150,28 +150,39 @@ const SingleBlade = ({ bendAmountRef, bladeThickness }: SingleBladeProps) => {
   );
   const sharedUniformsRef = useRef(material.uniforms);
 
-  const applyBendToShader = useCallback(
-    (shader: Shader) => {
-      console.log("Custom shadow onBeforeCompile triggered.");
-      const sharedUniforms = sharedUniformsRef.current;
+const applyBendToShader = useCallback(
+  (shader: Shader) => {
+    const sharedUniforms = sharedUniformsRef.current;
 
-      shader.uniforms.uHeight = sharedUniforms.uHeight;
-      shader.uniforms.uBendAmount = sharedUniforms.uBendAmount;
-      shader.uniforms.uMaxBendAngle = sharedUniforms.uMaxBendAngle;
+    shader.uniforms.uHeight = sharedUniforms.uHeight;
+    shader.uniforms.uBendAmount = sharedUniforms.uBendAmount;
+    shader.uniforms.uMaxBendAngle = sharedUniforms.uMaxBendAngle;
 
-      shader.vertexShader = shader.vertexShader.replace(
-        /vec3\s+transformed\s*=\s*vec3\s*\(\s*position\s*\);\s*/,
-        `vec3 transformed = vec3( position );
-        {
-          vec3 bendPos = transformed;
-          ${bendChunk.replace(/transformed/g, "bendPos")}
-          transformed = bendPos;
-        }`,
-      );
-      console.log(shader.vertexShader.includes("vec3 bendPos"));
-    },
-    [bendChunk],
-  );
+    shader.vertexShader = shader.vertexShader.replace(
+      /#include\s*<common>/,
+      `#include <common>
+uniform float uHeight;
+uniform float uBendAmount;
+uniform float uMaxBendAngle;`,
+    );
+
+    const bendBlock = `
+      {
+        vec3 bendPos = transformed;
+${bendChunk.replace(/transformed/g, "bendPos")}
+        transformed = bendPos;
+      }
+    `;
+
+    shader.vertexShader = shader.vertexShader.replace(
+      /#include\s*<begin_vertex>/,
+      `#include <begin_vertex>\n${bendBlock}`,
+    );
+
+    console.log(shader.vertexShader.includes("bendPos"));
+  },
+  [bendChunk],
+);
 
   const depthMaterial = useMemo(() => {
     if (!USE_CUSTOM_SHADOW) return null;
