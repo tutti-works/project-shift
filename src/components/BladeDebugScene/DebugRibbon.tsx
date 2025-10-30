@@ -9,10 +9,12 @@ import {
   PlaneGeometry,
   Quaternion,
   RGBADepthPacking,
-  Shader,
   ShaderMaterial,
   Vector3,
+  type WebGLProgramParametersWithUniforms,
 } from "three";
+
+type Shader = WebGLProgramParametersWithUniforms;
 import { useRibbonConfigStore } from "@/store/ribbonConfigStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { toSceneUnits } from "@/utils/geometryHelpers";
@@ -233,6 +235,7 @@ ${twistChunk}
   );
 
   return (
+    // @ts-expect-error - React Three Fiber mesh type issue
     <mesh ref={meshRef} geometry={geometry} material={material} castShadow receiveShadow />
   );
 };

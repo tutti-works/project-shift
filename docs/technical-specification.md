@@ -30,8 +30,17 @@ project-shift/
 │   │   ├── BladeInstances.tsx    # 羽板の InstancedMesh
 │   │   ├── RibbonInstances.tsx   # リボンの InstancedMesh
 │   │   ├── WireInstances.tsx     # ワイヤーの InstancedMesh
-│   │   ├── CameraController.tsx  # カメラ制御
-│   │   └── ScrollController.tsx  # スクロール制御
+│   │   ├── CameraController.tsx  # カメラ制御（マウスオービット対応）
+│   │   ├── ScrollController.tsx  # スクロール制御
+│   │   ├── ScrollIndicator.tsx   # スクロールインジケーター
+│   │   ├── Particles.tsx         # パーティクルシステム
+│   │   ├── Ground.tsx            # 地面
+│   │   └── BladeDebugScene/      # デバッグシーン関連コンポーネント
+│   │       ├── index.tsx
+│   │       ├── DebugBladeInstances.tsx
+│   │       ├── DebugRibbonInstances.tsx
+│   │       ├── DebugWireInstances.tsx
+│   │       └── ...               # その他デバッグ用コンポーネント
 │   ├── shaders/
 │   │   ├── bladeVertex.glsl      # 羽板用 Vertex Shader
 │   │   ├── bladeFragment.glsl    # 羽板用 Fragment Shader
@@ -41,7 +50,15 @@ project-shift/
 │   │   └── animation.ts          # アニメーション設定
 │   ├── utils/
 │   │   ├── animationHelpers.ts   # アニメーション計算ヘルパー
-│   │   └── geometryHelpers.ts    # ジオメトリ生成ヘルパー
+│   │   ├── geometryHelpers.ts    # ジオメトリ生成ヘルパー
+│   │   ├── cameraHelpers.ts      # カメラ計算ヘルパー
+│   │   ├── waveAnimation.ts      # 波アニメーション計算
+│   │   └── bladeHelpers.ts       # ブレード関連ユーティリティ
+│   ├── store/
+│   │   ├── scrollStore.ts        # スクロール状態管理
+│   │   ├── bladeShadeStore.ts    # ブレード陰影設定
+│   │   ├── mouseStore.ts         # マウス位置管理
+│   │   └── ...                   # その他のストア
 │   └── types/
 │       └── animation.ts          # 型定義
 ├── public/
@@ -49,7 +66,10 @@ project-shift/
 ├── docs/
 │   ├── requirements.md           # 要件定義書
 │   ├── technical-specification.md # 技術仕様書（本ファイル）
-│   └── animation-config.md       # アニメーション設定詳細
+│   ├── animation-config.md       # アニメーション設定詳細
+│   ├── instancing-51-blades.md   # 51本インスタンシング実装記録
+│   ├── session-updates.md        # セッション実装記録
+│   └── ...                       # その他のドキュメント
 └── package.json
 ```
 
@@ -699,15 +719,199 @@ const ShadowCameraHelper = ({ lightRef }) => {
 7. カスタムシャドウマテリアルの実装 ✅
 8. デバッグGUIの実装（lil-gui） ✅
 
-### Phase 2: 51本への拡張 🔄 **次のステップ**
-1. InstancedMesh への移行（羽板・リボン・ワイヤー）
-2. サイン波伝播アニメーションの実装
-3. 各ユニットごとの個別パラメータ計算
-4. カメラワークの実装
-5. ライティングの調整
+### Phase 2: 51本への拡張 ✅ **完了**
+1. InstancedMesh への移行（羽板・リボン・ワイヤー） ✅
+2. サイン波伝播アニメーションの実装 ✅
+3. 各ユニットごとの個別パラメータ計算 ✅
+4. カメラワークの実装 ✅
+5. ライティングの調整 ✅
+6. 本番シーンへの移植 ✅
 
-### Phase 3: 最適化・仕上げ
+### Phase 3: ユーザーインタラクション ✅ **完了**
+1. マウス連動カメラオービット ✅
+2. スクロールインジケーター ✅
+3. テキスト選択無効化 ✅
+4. パーティクルシステム ✅
+
+### Phase 4: 最適化・仕上げ 🔄 **進行中**
 1. パフォーマンスチューニング
 2. レスポンシブ対応の実装
 3. アニメーションパラメータの微調整
 4. ブラウザ互換性テスト
+5. 本番デプロイ準備
+
+---
+
+## 11. 新機能（Phase 3実装）
+
+### 11.1 マウス連動カメラオービット
+
+**概要**: マウスカーソルの位置に応じてカメラがターゲットを中心にオービットする機能
+
+**実装ファイル**:
+- `src/store/mouseStore.ts` - マウス位置の状態管理
+- `src/components/CameraController.tsx` - カメラオービット計算
+- `src/app/page.tsx` - マウスイベントリスナー
+
+**パラメータ**:
+- 横方向の回転: ±10度
+- 縦方向の回転: ±5度
+- イージング係数: 0.05（スムーズな追従）
+- 方向: 逆方向（パララックス効果）
+
+**技術詳細**:
+```typescript
+// マウス位置の正規化 (-1 to 1)
+const x = (event.clientX / window.innerWidth) * 2 - 1;
+const y = (event.clientY / window.innerHeight) * 2 - 1;
+
+// 角度計算（逆方向）
+const horizontalAngle = -smoothMouseX * (10 * Math.PI / 180);
+const verticalAngle = -smoothMouseY * (5 * Math.PI / 180);
+
+// カメラ位置の計算（球面座標系）
+// Y軸周りの回転 + ピッチ回転
+```
+
+### 11.2 スクロールインジケーター
+
+**概要**: ユーザーにスクロールを促すアニメーション付きUIコンポーネント
+
+**実装ファイル**:
+- `src/components/ScrollIndicator.tsx`
+- `src/components/ScrollIndicator.module.css`
+
+**デザイン仕様**:
+- **配置**: 画面中央下部（bottom: 40px）
+- **背景**: 半透明ダークグレー（rgba(40, 40, 40, 0.75)）
+- **エフェクト**: 
+  - ガラスモーフィズム（backdrop-filter: blur(12px)）
+  - 縁のぼかし（filter: blur(0.5px)）
+  - 角丸（border-radius: 20px）
+  - シャドウ（box-shadow）
+
+**アニメーション**:
+1. **マウスホイール**: 上から下へ移動しながらフェードアウト（1.5秒ループ）
+2. **矢印**: 3つの矢印が0.15秒ずつ遅延してバウンス（2秒ループ）
+3. **フェードアウト**: スクロール開始後（50px以上）に自動的に消える
+
+### 11.3 パーティクルシステム
+
+**概要**: 中空球体内にランダム配置された静止パーティクル
+
+**実装ファイル**:
+- `src/components/Particles.tsx`
+
+**仕様**:
+- **パーティクル数**: 400個
+- **サイズ**: 0.15
+- **色**: 白（#ffffff）
+- **不透明度**: 0.8
+- **配置範囲**: 
+  - 外側の球: 半径30（直径60）
+  - 内側の球: 半径10（直径20）を除外
+  - 中心: 原点(0, 0, 0)
+
+**数学的実装**:
+```typescript
+// 中空球体内の均一分布
+const innerVolume = Math.pow(INNER_RADIUS, 3);
+const outerVolume = Math.pow(OUTER_RADIUS, 3);
+const r = Math.cbrt(innerVolume + Math.random() * (outerVolume - innerVolume));
+
+// 球面座標からデカルト座標への変換
+const x = r * Math.sin(phi) * Math.cos(theta);
+const y = r * Math.sin(phi) * Math.sin(theta);
+const z = r * Math.cos(phi);
+```
+
+**レンダリング**:
+- `THREE.Points` + `THREE.PointsMaterial`
+- GPU インスタンシングによる効率的な描画
+- 常にカメラの方を向く（ビルボード効果）
+
+### 11.4 ユーザーエクスペリエンス向上
+
+**テキスト選択無効化**:
+```css
+body.hide-scrollbar {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+```
+
+**スクロールバー非表示**:
+```css
+body.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+body.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+```
+
+---
+
+## 12. ビルドシステム
+
+### 12.1 型チェックスクリプト
+
+**package.json**:
+```json
+{
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  }
+}
+```
+
+**用途**:
+- ビルド前の高速な型チェック
+- CI/CDパイプラインでの自動検証
+- 全ての型エラーを一度に発見
+
+### 12.2 型定義の修正
+
+**Three.js r150以降の対応**:
+```typescript
+// Shader型がエクスポートされないため、型エイリアスを使用
+import { type WebGLProgramParametersWithUniforms } from "three";
+type Shader = WebGLProgramParametersWithUniforms;
+```
+
+**React Three Fiber型エラーの回避**:
+```typescript
+// ファイル先頭に追加
+// @ts-nocheck - React Three Fiber type issues
+```
+
+### 12.3 ビルド結果
+
+**バンドルサイズ**:
+- メインページ: 95.1 kB (First Load JS)
+- 共有チャンク: 87.3 kB
+- 静的HTML生成: 全ページ
+
+**最適化**:
+- Tree shaking
+- コード分割
+- 圧縮・minify
+- 静的サイト生成（SSG）
+
+---
+
+## 13. 参考資料
+
+### ドキュメント
+- [session-updates.md](./session-updates.md) - 最新セッションの実装記録
+- [instancing-51-blades.md](./instancing-51-blades.md) - 51本インスタンシング実装計画
+- [animation-config.md](./animation-config.md) - アニメーション設定詳細
+
+### 外部リンク
+- [Three.js Documentation](https://threejs.org/docs/)
+- [React Three Fiber](https://docs.pmnd.rs/react-three-fiber/)
+- [Next.js Documentation](https://nextjs.org/docs)
+

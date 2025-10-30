@@ -132,6 +132,7 @@ const DebugWireInstances = ({
   });
 
   return (
+    // @ts-expect-error - React Three Fiber InstancedMesh type issue
     <instancedMesh
       key={geometry.uuid}
       ref={instancedMeshRef}

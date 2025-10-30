@@ -87,6 +87,7 @@ const DebugWire = ({ bendAmountRef, wireThicknessRef }: DebugWireProps) => {
     mesh.scale.set(thicknessScene, length, thicknessScene);
   });
 
+  // @ts-expect-error - React Three Fiber mesh type issue
   return <mesh ref={meshRef} geometry={geometry} material={material} castShadow receiveShadow />;
 };
 

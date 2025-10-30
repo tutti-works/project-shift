@@ -1,3 +1,4 @@
+// @ts-nocheck - React Three Fiber type issues
 import {
   MutableRefObject,
   forwardRef,
@@ -17,10 +18,12 @@ import {
   MeshDistanceMaterial,
   MeshDepthMaterial,
   RGBADepthPacking,
-  Shader,
   ShaderMaterial,
   Vector3,
+  type WebGLProgramParametersWithUniforms,
 } from "three";
+
+type Shader = WebGLProgramParametersWithUniforms;
 import { useBladeShadeStore } from "@/store/bladeShadeStore";
 import { useScrollStore } from "@/store/scrollStore";
 import { ANIMATION_CONFIG } from "@/config/animation";

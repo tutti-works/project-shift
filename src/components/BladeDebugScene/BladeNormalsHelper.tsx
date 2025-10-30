@@ -1,7 +1,7 @@
 import { MutableRefObject, useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Mesh } from "three";
-import { VertexNormalsHelper } from "three/examples/jsm/helpers/VertexNormalsHelper";
+import { VertexNormalsHelper } from "three/addons/helpers/VertexNormalsHelper.js";
 
 type BladeNormalsHelperProps = {
   meshRef: MutableRefObject<Mesh | null>;

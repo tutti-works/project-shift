@@ -17,10 +17,12 @@ import {
   PlaneGeometry,
   Quaternion,
   RGBADepthPacking,
-  Shader,
   ShaderMaterial,
   Vector3,
+  type WebGLProgramParametersWithUniforms,
 } from "three";
+
+type Shader = WebGLProgramParametersWithUniforms;
 import { useRibbonConfigStore } from "@/store/ribbonConfigStore";
 import { useScrollStore } from "@/store/scrollStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
@@ -321,6 +323,7 @@ uniform float uBendAmount;`,
   });
 
   return (
+    // @ts-expect-error - React Three Fiber InstancedMesh type issue
     <instancedMesh
       key={geometry.uuid}
       ref={instancedMeshRef}

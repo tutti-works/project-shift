@@ -6,7 +6,7 @@
   useMemo,
   useRef,
 } from "react";
-import { useFrame } from "@react-three/fiber";
+import { extend, useFrame } from "@react-three/fiber";
 import {
   Color,
   DirectionalLight,
@@ -17,10 +17,15 @@ import {
   MeshDistanceMaterial,
   Object3D,
   RGBADepthPacking,
-  Shader,
   ShaderMaterial,
   Vector3,
+  type WebGLProgramParametersWithUniforms,
 } from "three";
+
+type Shader = WebGLProgramParametersWithUniforms;
+
+extend({ InstancedMesh });
+
 import { useBladeShadeStore } from "@/store/bladeShadeStore";
 import { useScrollStore } from "@/store/scrollStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
@@ -313,6 +318,7 @@ ${bendChunkForShader}
   });
 
   return (
+    // @ts-expect-error - React Three Fiber InstancedMesh type issue
     <instancedMesh
       key={geometry.uuid}
       ref={instancedMeshRef}

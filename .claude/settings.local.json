@@ -6,7 +6,10 @@
       "Bash(claude mcp add:*)",
       "Bash(claude mcp list:*)",
       "Bash(node --eval:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Bash(npm run build:*)",
+      "Bash(Select-String -Pattern \"Successfully|Failed|error:\")",
+      "Bash(npm run type-check:*)"
     ],
     "deny": [],
     "ask": []
