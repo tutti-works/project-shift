@@ -1,27 +1,52 @@
-"use client";
-
-import { useLayoutEffect, useMemo, useRef } from "react";
 import {
-  Color,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
+import { useFrame } from "@react-three/fiber";
+import {
   CylinderGeometry,
+  Color,
   InstancedMesh,
-  Matrix4,
   MeshStandardMaterial,
+  Object3D,
+  Quaternion,
+  Vector3,
 } from "three";
+import { useScrollStore } from "@/store/scrollStore";
+import { getBendAmount } from "@/utils/waveAnimation";
 import { ANIMATION_CONFIG } from "@/config/animation";
-import { generateUnitPositions, toSceneUnits } from "@/utils/geometryHelpers";
+import { toSceneUnits } from "@/utils/geometryHelpers";
+import { computeWireAttachmentPointMM } from "@/utils/bladeHelpers";
+
+const TOTAL_UNITS = 51;
+const CENTER_INDEX = 25;
+const UNIT_PITCH_MM = 120;
 
 const WireInstances = () => {
-  const meshRef = useRef<InstancedMesh>(null);
-  const positions = useMemo(() => generateUnitPositions(), []);
+  const instancedMeshRef = useRef<InstancedMesh>(null);
+  const tempInstanceObject = useMemo(() => new Object3D(), []);
+
+  const anchorBase = useMemo(
+    () => new Vector3(0, 0, -toSceneUnits(ANIMATION_CONFIG.wire.anchorDistance)),
+    [],
+  );
+  const up = useMemo(() => new Vector3(0, 1, 0), []);
+  const tempEnd = useMemo(() => new Vector3(), []);
+  const tempDir = useMemo(() => new Vector3(), []);
+  const tempMid = useMemo(() => new Vector3(), []);
+  const tempQuat = useMemo(() => new Quaternion(), []);
+  const basePosition = useMemo(() => new Vector3(), []);
+  const baseScale = useMemo(() => new Vector3(1, 1, 1), []);
+  const scrollProgress = useScrollStore((state) => state.progress);
 
   const geometry = useMemo(
     () =>
       new CylinderGeometry(
-        toSceneUnits(ANIMATION_CONFIG.wire.diameter / 2),
-        toSceneUnits(ANIMATION_CONFIG.wire.diameter / 2),
-        toSceneUnits(ANIMATION_CONFIG.blade.height),
-        ANIMATION_CONFIG.wire.radialSegments,
+        0.5,
+        0.5,
+        1,
+        Math.max(ANIMATION_CONFIG.wire.radialSegments, 6),
       ),
     [],
   );
@@ -36,32 +61,69 @@ const WireInstances = () => {
     [],
   );
 
-  useLayoutEffect(() => {
-    const mesh = meshRef.current;
+  useEffect(
+    () => () => {
+      geometry.dispose();
+      material.dispose();
+    },
+    [geometry, material],
+  );
+
+  useFrame(() => {
+    const mesh = instancedMeshRef.current;
     if (!mesh) {
       return;
     }
 
-    const matrix = new Matrix4();
-    const yOffset = toSceneUnits(ANIMATION_CONFIG.blade.height / 2);
-    const zOffset = -toSceneUnits(ANIMATION_CONFIG.wire.anchorDistance / 2);
+    const progress = Math.min(Math.max(scrollProgress, 0), 1);
+    const thicknessScene = toSceneUnits(Math.max(ANIMATION_CONFIG.wire.diameter / 2, 0.1));
+    let anyVisible = false;
 
-    positions.forEach((position, index) => {
-      matrix.makeTranslation(
-        toSceneUnits(position.x),
-        yOffset,
-        zOffset,
+    for (let i = 0; i < TOTAL_UNITS; i++) {
+      const bendAmount = getBendAmount(i, progress);
+
+      const { point } = computeWireAttachmentPointMM(bendAmount);
+      tempEnd.set(0, toSceneUnits(point.y), toSceneUnits(point.z));
+      tempDir.copy(tempEnd).sub(anchorBase);
+
+      const length = tempDir.length();
+      const hasLength = length > 1e-6;
+      if (hasLength) {
+        anyVisible = true;
+        tempDir.normalize();
+        tempQuat.setFromUnitVectors(up, tempDir);
+      } else {
+        tempQuat.identity();
+      }
+
+      tempMid.copy(anchorBase).add(tempEnd).multiplyScalar(0.5);
+      basePosition.copy(tempMid);
+      const scaleY = hasLength ? Math.max(length, 1e-4) : 1e-4;
+      baseScale.set(thicknessScene, scaleY, thicknessScene);
+
+      const xOffset = toSceneUnits((i - CENTER_INDEX) * UNIT_PITCH_MM);
+      tempInstanceObject.position.set(
+        basePosition.x + xOffset,
+        basePosition.y,
+        basePosition.z,
       );
-      mesh.setMatrixAt(index, matrix);
-    });
+      tempInstanceObject.quaternion.copy(tempQuat);
+      tempInstanceObject.scale.copy(baseScale);
+      tempInstanceObject.updateMatrix();
+      mesh.setMatrixAt(i, tempInstanceObject.matrix);
+    }
 
+    mesh.visible = anyVisible;
     mesh.instanceMatrix.needsUpdate = true;
-  }, [positions]);
+  });
 
   return (
     <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, positions.length]}
+      key={geometry.uuid}
+      ref={instancedMeshRef}
+      args={[geometry, material, TOTAL_UNITS]}
+      geometry={geometry}
+      material={material}
       castShadow
       receiveShadow
     />

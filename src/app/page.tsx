@@ -1,12 +1,17 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import ScrollController from "@/components/ScrollController";
 import { useScrollMultiplierStore } from "@/store/scrollMultiplierStore";
 
-const BladeDebugScene = dynamic(
-  () => import("@/components/BladeDebugScene"),
+// 本番シーンとデバッグシーンの切り替え
+const USE_DEBUG_SCENE = false; // true: デバッグシーン, false: 本番シーン
+
+const Scene = dynamic(
+  () => USE_DEBUG_SCENE
+    ? import("@/components/BladeDebugScene")
+    : import("@/components/Scene"),
   {
     ssr: false,
   },
@@ -17,27 +22,39 @@ const Home = () => {
     (state) => state.scrollMultiplier,
   );
 
-  // ページの高さを scrollMultiplier に応じて動的に計算
-  // 100vh(固定) + (100vh × scrollMultiplier)(スクロール可能領域)
-  const pageHeight = useMemo(() => {
-    const baseHeight = 100; // 100vh
-    const scrollableHeight = baseHeight * scrollMultiplier;
-    return baseHeight + scrollableHeight; // vh単位
-  }, [scrollMultiplier]);
+  // 本番シーンではスクロールバーを非表示
+  useEffect(() => {
+    if (!USE_DEBUG_SCENE) {
+      document.body.classList.add("hide-scrollbar");
+    } else {
+      document.body.classList.remove("hide-scrollbar");
+    }
 
-  const pageStyle = useMemo(
-    () => ({
-      minHeight: `${pageHeight}vh`,
-    }),
-    [pageHeight],
-  );
+    return () => {
+      document.body.classList.remove("hide-scrollbar");
+    };
+  }, []);
+
+  // デバッグシーンではscrollMultiplierを使用、本番シーンでは固定
+  const pageStyle = useMemo(() => {
+    if (USE_DEBUG_SCENE) {
+      const baseHeight = 100;
+      const scrollableHeight = baseHeight * scrollMultiplier;
+      return {
+        minHeight: `${baseHeight + scrollableHeight}vh`,
+      };
+    }
+    return {
+      minHeight: "600vh",
+    };
+  }, [scrollMultiplier]);
 
   return (
     <main style={pageStyle} className="relative overflow-hidden bg-black text-white">
       <ScrollController />
 
       <div className="fixed inset-0 h-screen w-screen">
-        <BladeDebugScene />
+        <Scene />
       </div>
 
       <article style={pageStyle} className="pointer-events-none relative z-10 flex flex-col justify-between">
@@ -47,7 +64,7 @@ const Home = () => {
           </h1>
         </section>
 
-        <section className="pointer-events-auto mx-auto w-full max-w-4xl space-y-6 px-6 pb-24 md:px-10">
+        <section className="pointer-events-auto mx-auto w-full max-w-4xl space-y-6 px-6 pb-32 md:px-10">
           <h2 className="text-xl font-semibold text-zinc-200">
             Ryusei Asakawa
           </h2>

@@ -3,22 +3,15 @@
 import { Suspense, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import ShiftStructure from "@/components/ShiftStructure";
+import Ground from "@/components/Ground";
 import { useBladeShadeStore } from "@/store/bladeShadeStore";
 import CameraController from "@/components/CameraController";
 import { ANIMATION_CONFIG } from "@/config/animation";
-import { getCameraPosition } from "@/utils/animationHelpers";
+import { getCameraPositionForScroll } from "@/utils/cameraHelpers";
 import { toSceneUnits } from "@/utils/geometryHelpers";
 
 const Scene = () => {
-  const initialCameraPosition = useMemo(() => getCameraPosition(0), []);
-  const cameraTarget = useMemo(() => {
-    const { camera } = ANIMATION_CONFIG;
-    return [
-      toSceneUnits(camera.target.x),
-      toSceneUnits(camera.target.y),
-      toSceneUnits(camera.target.z),
-    ] as const;
-  }, []);
+  const initialCameraPosition = useMemo(() => getCameraPositionForScroll(0), []);
   const ambientIntensity = useBladeShadeStore(
     (state) => state.ambientIntensity,
   );
@@ -59,7 +52,8 @@ const Scene = () => {
 
       <Suspense fallback={null}>
         <ShiftStructure />
-        <CameraController target={cameraTarget} />
+        <Ground />
+        <CameraController />
       </Suspense>
     </Canvas>
   );

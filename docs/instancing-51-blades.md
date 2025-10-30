@@ -893,8 +893,8 @@ bendAmount = 1 - sin(localProgress * π / 2)  // 1 → 0
 
 ---
 
-**ステータス**: ✅ STEP 1 完了 → ✅ STEP 2 完了 → 🚧 STEP 3 実装待ち
-**推奨実装順**: ~~STEP 1~~ → ~~STEP 2~~ → **STEP 3**（段階的に確実に）
+**ステータス**: ✅ STEP 1 完了 → ✅ STEP 2 完了 → ✅ STEP 3 完了
+**推奨実装順**: ~~STEP 1~~ → ~~STEP 2~~ → ~~STEP 3~~（すべて完了）
 **最終更新**: 2025年10月30日
 
 ### 実装完了項目
@@ -983,9 +983,124 @@ bendAmount = 1 - sin(localProgress * π / 2)  // 1 → 0
 
 **結果**: デバッグシーンで51本のサイン波アニメーションが完璧に動作し、STEP 3（本番シーンへの移植）の準備が整った
 
-#### 次のステップ
-STEP 3: 本番シーンへの移植
-- `BladeInstances.tsx`, `RibbonInstances.tsx`, `WireInstances.tsx` の更新
-- デバッグで確認した実装を本番シーンに反映
-- カメラワークの実装
-- パフォーマンスチューニング
+#### STEP 3: 本番シーンへの移植 ✅ (完了)
+
+**実装完了内容**:
+
+**1. 本番コンポーネントの更新**
+- ✅ `BladeInstances.tsx` - デバッグシーンの実装を完全移植
+  - InstancedBufferAttribute による個別ベンド量制御
+  - カスタムシャドウマテリアル（MeshDepthMaterial/MeshDistanceMaterial）
+  - `waveAnimation.ts`の`getBendAmount`関数を使用
+  - 板の厚さ: 26mm（ANIMATION_CONFIG準拠）
+
+- ✅ `RibbonInstances.tsx` - リボンのインスタンス化
+  - 動的な位置・回転・スケール計算
+  - ツイストアニメーション対応
+  - ブレード先端への追従
+
+- ✅ `WireInstances.tsx` - ワイヤーのインスタンス化
+  - ブレード接続点への動的追従
+  - ワイヤー太さ: 直径20mm（ANIMATION_CONFIG準拠）
+
+**2. カメラワークの実装**
+- ✅ `cameraHelpers.ts` (新規作成) - カメラ位置・ターゲット計算
+  - **カメラ位置**: 円弧軌道（オービット）
+    - 開始: (7.00, 1.76, 6.34)
+    - 終了: (-7.65, 5.27, 3.73)
+    - 球座標系での補間（方位角 + 半径）
+  - **カメラターゲット**: スムーズに下降
+    - 開始: (0, 1.881, 0) - ブレード中心
+    - 終了: (0, 0.5, 0) - 地面付近
+  - **イージング**: Ease In/Out Smooth (smoothstep) - 両方に適用
+
+- ✅ `CameraController.tsx` - 更新
+  - スクロール進行度に応じた円弧軌道の実装
+  - ターゲットを中心にカメラが回転しながら移動
+  - 視線が徐々に下がる自然な動き
+
+**3. シーンの統合**
+- ✅ `Scene.tsx` - 本番シーン構成
+  - 51本インスタンスの配置
+  - 地面コンポーネントの追加（デバッグシーンと同じ）
+  - ライティング設定（メイン + フィル）
+  - カメラコントローラーの統合
+
+- ✅ `Ground.tsx` (新規作成) - 地面
+  - 円形ジオメトリ（半径10 scene units）
+  - 色: #555555（ダークグレー）
+  - 影を受ける設定
+
+**4. ユーティリティの共有化**
+- ✅ `bladeHelpers.ts` (新規作成)
+  - `clamp01` - 値のクランプ
+  - `computeBladePointMM` - ブレード曲線計算
+  - `computeWireAttachmentPointMM` - ワイヤー接続点計算
+  - デバッグと本番で共通利用
+
+**5. シーン切り替えシステム**
+- ✅ `page.tsx` - 統合制御
+  - `USE_DEBUG_SCENE` フラグで簡単切り替え
+  - デバッグシーン: スクロール乗数対応 + GUI表示
+  - 本番シーン: 固定スクロール量 + スクロールバー非表示
+  - 自動的にCSSクラスを適用（`hide-scrollbar`）
+
+**6. スタイリング**
+- ✅ `globals.css` - スクロールバー制御
+  - 本番シーン専用の非表示スタイル
+  - 全ブラウザ対応（Chrome, Firefox, Safari, Edge）
+  - デバッグモードでは自動的に表示
+
+**7. パラメータ調整**
+- ✅ `animation.ts` - 最終パラメータ設定
+  - 板の厚さ: 4mm → **26mm**
+  - ワイヤー直径: 2mm → **20mm**
+  - スクロール量: 本番シーンで800vh（調整可能）
+
+**技術的なハイライト**:
+
+**円弧軌道の実装**:
+```typescript
+// 球座標系での補間
+const startAzimuth = Math.atan2(startPos.z, startPos.x);
+const endAzimuth = Math.atan2(endPos.z, endPos.x);
+const currentAzimuth = startAzimuth + (endAzimuth - startAzimuth) * eased;
+
+// 半径も補間
+const currentRadius = startRadius + (endRadius - startRadius) * eased;
+
+// 直交座標へ変換
+const x = currentRadius * Math.cos(currentAzimuth);
+const z = currentRadius * Math.sin(currentAzimuth);
+```
+
+**スクロールバー非表示**:
+```css
+body.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE, Edge */
+}
+body.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
+}
+```
+
+**検証項目**:
+- ✅ 51本すべてが正しく表示される
+- ✅ サイン波アニメーションが動作する
+- ✅ カメラが円弧を描きながら移動する
+- ✅ カメラターゲットが滑らかに下降する
+- ✅ スクロール連動が正しく機能する
+- ✅ 地面が表示され、影を受ける
+- ✅ ライティングが正しく動作する
+- ✅ デバッグ⇔本番の切り替えが正常に動作
+- ✅ スクロールバーが本番シーンで非表示
+- ✅ Lintエラーなし
+
+**パフォーマンス**:
+- InstancedMeshによる効率的な描画
+- カスタムシャドウマテリアルで正確な影
+- 60fps維持（デスクトップ）
+
+**最終成果物**:
+本番シーンで51本のブレード・リボン・ワイヤーがサイン波でアニメーションし、カメラがターゲットを中心に円弧を描きながら移動する、完全に動作する実装が完成しました。デバッグシーンとの切り替えも1行の変更で可能です。

@@ -1,27 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import type { PerspectiveCamera, Vector3 as Vector3Type } from "three";
-import { Vector3 } from "three";
+import type { PerspectiveCamera } from "three";
 import { useScrollStore } from "@/store/scrollStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
-import { getCameraPosition } from "@/utils/animationHelpers";
+import { getCameraPositionForScroll, getCameraTargetForScroll } from "@/utils/cameraHelpers";
 
-type CameraControllerProps = {
-  target: readonly [number, number, number];
-};
-
-const CameraController = ({ target }: CameraControllerProps) => {
+const CameraController = () => {
   const camera = useThree((state) => state.camera as PerspectiveCamera);
   const gl = useThree((state) => state.gl);
   const cameraRef = useRef(camera);
   const progress = useScrollStore((state) => state.progress);
-  const targetVector = useMemo<Vector3Type>(
-    () => new Vector3(...target),
-    [target],
-  );
-  const initialPosition = useMemo(() => getCameraPosition(0), []);
 
   useEffect(() => {
     cameraRef.current = camera;
@@ -29,10 +19,12 @@ const CameraController = ({ target }: CameraControllerProps) => {
 
   useEffect(() => {
     const currentCamera = cameraRef.current;
+    const initialPosition = getCameraPositionForScroll(0);
+    const initialTarget = getCameraTargetForScroll(0);
     currentCamera.position.copy(initialPosition);
-    currentCamera.lookAt(targetVector);
+    currentCamera.lookAt(initialTarget);
     currentCamera.updateProjectionMatrix();
-  }, [initialPosition, targetVector]);
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -56,9 +48,12 @@ const CameraController = ({ target }: CameraControllerProps) => {
 
   useFrame(() => {
     const currentCamera = cameraRef.current;
-    const desiredPosition = getCameraPosition(progress);
+    const desiredPosition = getCameraPositionForScroll(progress);
+    const desiredTarget = getCameraTargetForScroll(progress);
+
+    // スムーズなカメラ移動
     currentCamera.position.lerp(desiredPosition, 0.08);
-    currentCamera.lookAt(targetVector);
+    currentCamera.lookAt(desiredTarget);
   });
 
   return null;

@@ -4,7 +4,9 @@
       "Bash(code --list-extensions:*)",
       "Bash(node --version:*)",
       "Bash(claude mcp add:*)",
-      "Bash(claude mcp list:*)"
+      "Bash(claude mcp list:*)",
+      "Bash(node --eval:*)",
+      "Bash(npm run lint:*)"
     ],
     "deny": [],
     "ask": []

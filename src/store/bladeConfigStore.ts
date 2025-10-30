@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { ANIMATION_CONFIG } from "@/config/animation";
 
 type BladeConfigState = {
   bladeThickness: number;

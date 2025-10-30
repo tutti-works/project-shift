@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { ANIMATION_CONFIG } from "@/config/animation";
 
 type RibbonConfigState = {
   twistAngleAtRest: number;
@@ -8,7 +7,6 @@ type RibbonConfigState = {
   setTwistAngleAtMax: (value: number) => void;
 };
 
-const { maxTwistAngle } = ANIMATION_CONFIG.ribbon;
 const MIN_TWIST_ANGLE = -Math.PI * 2;
 const MAX_TWIST_ANGLE = Math.PI * 2;
 
