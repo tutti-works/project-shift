@@ -110,7 +110,25 @@ npm run lint
 
 ### ✅ 最近完了した項目
 
-#### 1. **リボンのデバッグモード実装** ✅ **完了**
+#### 1. **羽板の陰影（Shading）実装** ✅ **完了**
+   - **実装内容**:
+     - Jacobian逆転置行列による法線の正確な再計算 ✅
+     - Lambert拡散反射 + Blinn-Phong鏡面反射の実装 ✅
+     - ワールド空間でのライティング計算 ✅
+     - Zustand Store（bladeShadeStore）による状態管理 ✅
+   - **デバッグ機能**:
+     - BladeNormalsHelper: 法線ベクトルの可視化
+     - AxesIndicator: 座標軸の表示
+     - ShadowCameraHelper: シャドウカメラの可視化
+   - **調整可能なパラメータ（デバッグGUI）**:
+     - Ambient Intensity: 環境光強度（0〜1.5）
+     - Specular Intensity: 鏡面反射強度（0〜1）
+     - Specular Power: 鏡面反射鋭さ（1〜256）
+     - Directional Intensity: 平行光源強度（0〜5）
+   - **コンポーネント分離**: `src/components/BladeDebugScene/` ディレクトリ化
+   - **参考**: [docs/blade-shading.md](docs/blade-shading.md)
+
+#### 2. **リボンのデバッグモード実装** ✅ **完了**
    - **実装内容**:
      - グラデーション状のねじれ（根本で最大、先端で0） ✅
      - GUIによるインタラクティブ制御（基準角度・最大角度） ✅
@@ -119,7 +137,7 @@ npm run lint
    - **調整可能なパラメータ（デバッグGUI）**:
      - Ribbon Twist (deg, rest): リボンの静止時ねじれ角度（-180〜180度）
      - Ribbon Twist (deg, max): リボンの最大曲げ時ねじれ角度（-180〜360度）
-   - **ファイル**: [src/components/BladeDebugScene.tsx](src/components/BladeDebugScene.tsx)
+   - **ファイル**: [src/components/BladeDebugScene/DebugRibbon.tsx](src/components/BladeDebugScene/DebugRibbon.tsx)
    - **参考**: [docs/ribbon-implementation.md](docs/ribbon-implementation.md) | [docs/shadow-issue.md](docs/shadow-issue.md)
 
 ### 🔄 進行中・調整が必要な項目

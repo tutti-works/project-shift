@@ -117,16 +117,26 @@ Webページのスクロール位置（0%〜100%）に応じて、以下のア�
    * パフォーマンス計測と実現可能性の確認 ✅
    * **達成事項:**
      * 羽板の円弧状のしなりアニメーションをカスタムシェーダーで実装
+     * **羽板の陰影実装**（Jacobian逆転置行列による法線再計算 + Blinn-Phongライティング）
      * リボンの根本から先端へのグラデーション状ねじれアニメーションを実装
      * ワイヤーの動的な2点間接続（地面アンカー ⇔ 羽板先端）を実装
      * 曲面シャドウ対応（カスタムDepth/DistanceMaterialによるシャドウシェーダー統合）
      * デバッグGUI実装（lil-gui）によるリアルタイムパラメータ調整機能
+     * **デバッグヘルパー実装**（法線可視化・座標軸・シャドウカメラ）
+     * **コンポーネント分離**（BladeDebugSceneディレクトリ化）
      * スクロール連動アニメーション（0%→50%→100%）の動作確認
    * **調整可能なパラメータ（デバッグGUI）:**
      * Wire Thickness: ワイヤーの太さ（0.5〜20mm）
-     * Blade Thickness: 羽板の厚さ（1〜20mm）
+     * Blade Thickness: 羽板の厚さ（1〜60mm）
      * Ribbon Twist (deg, rest): リボンの静止時ねじれ角度（-180〜180度）
      * Ribbon Twist (deg, max): リボンの最大曲げ時ねじれ角度（-180〜360度）
+     * Ambient Intensity: 環境光強度（0〜1.5）
+     * Specular Intensity: 鏡面反射強度（0〜1）
+     * Specular Power: 鏡面反射鋭さ（1〜256）
+     * Directional Intensity: 平行光源強度（0〜5）
+     * Show Normals: 法線可視化トグル
+     * Show Axes: 座標軸表示トグル
+     * Show Shadow Helper: シャドウカメラ可視化トグル
 
 2. **Phase 2: 51本への拡張** 🔄 **次のステップ**
    * InstancedMesh を使用して51本に拡張

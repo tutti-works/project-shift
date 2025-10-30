@@ -3,6 +3,7 @@
 import { Suspense, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import ShiftStructure from "@/components/ShiftStructure";
+import { useBladeShadeStore } from "@/store/bladeShadeStore";
 import CameraController from "@/components/CameraController";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { getCameraPosition } from "@/utils/animationHelpers";
@@ -18,6 +19,9 @@ const Scene = () => {
       toSceneUnits(camera.target.z),
     ] as const;
   }, []);
+  const ambientIntensity = useBladeShadeStore(
+    (state) => state.ambientIntensity,
+  );
 
   return (
     <Canvas
@@ -32,7 +36,7 @@ const Scene = () => {
       }}
     >
       <color attach="background" args={["#050505"]} />
-      <ambientLight intensity={ANIMATION_CONFIG.lighting.ambient.intensity} />
+      <ambientLight intensity={ambientIntensity} />
       <directionalLight
         position={[
           toSceneUnits(ANIMATION_CONFIG.lighting.mainLight.position[0]),

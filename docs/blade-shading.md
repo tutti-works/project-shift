@@ -688,5 +688,206 @@ transformedNormal = TBN * originalNormal;
 
 ---
 
-**ステータス**: 📋 計画完了、実装待ち
+## ✅ 実装完了
+
+### 達成事項
+
+#### 1. **法線の再計算実装** ✅
+- **実装方式**: Jacobian逆転置行列を使用した高精度法線計算
+- **対象ファイル**: [src/shaders/bladeDebugVertex.glsl](../src/shaders/bladeDebugVertex.glsl)
+- **技術詳細**:
+  - しなり変形のJacobian行列の逆転置を計算
+  - `mat3 jacobianInvTranspose` による法線変換
+  - ゼロ除算対策（`safeCos` による安全な計算）
+  - ワールド空間での法線計算（`vWorldNormal`）
+
+**実装コード**:
+```glsl
+// Jacobian逆転置行列による法線変換
+float safeCos = abs(cosAngle) > 1e-4 ? cosAngle : (cosAngle >= 0.0 ? 1e-4 : -1e-4);
+float invCos = 1.0 / safeCos;
+float tanAngle = sinAngle * invCos;
+
+mat3 jacobianInvTranspose = mat3(
+  1.0,    0.0,        0.0,
+  0.0,    invCos,     0.0,
+  0.0,   -tanAngle,   1.0
+);
+
+vec3 bentNormal = normalize(jacobianInvTranspose * normal);
+vWorldNormal = normalize(mat3(modelMatrix) * bentNormal);
+```
+
+#### 2. **Blinn-Phongライティング実装** ✅
+- **実装方式**: Lambert拡散反射 + Blinn-Phong鏡面反射
+- **対象ファイル**: [src/shaders/bladeFragment.glsl](../src/shaders/bladeFragment.glsl)
+- **技術詳細**:
+  - Ambient（環境光）: `uAmbientIntensity`で調整可能
+  - Diffuse（拡散反射）: Lambert計算 `max(dot(normal, lightDir), 0.0)`
+  - Specular（鏡面反射）: Blinn-Phong計算 `pow(max(dot(normal, halfVector), 0.0), uSpecularPower)`
+  - ワールド空間でのライティング計算
+
+**実装コード**:
+```glsl
+// Lambert拡散反射
+float diffuseStrength = max(dot(normal, lightDir), 0.0);
+vec3 diffuse = uColor * uLightColor * diffuseStrength * uLightIntensity;
+
+// 環境光
+vec3 ambient = uColor * uAmbientColor * uAmbientIntensity;
+
+// Blinn-Phong鏡面反射
+vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+vec3 halfVector = normalize(lightDir + viewDir);
+float spec = pow(max(dot(normal, halfVector), 0.0), uSpecularPower) * uSpecularIntensity;
+vec3 specular = uLightColor * spec;
+
+vec3 finalColor = ambient + diffuse + specular;
+```
+
+#### 3. **Zustand Store実装** ✅
+- **対象ファイル**: [src/store/bladeShadeStore.ts](../src/store/bladeShadeStore.ts)
+- **管理パラメータ**:
+  - `ambientIntensity`: 環境光強度（0〜1.5）デフォルト: 0.35
+  - `specularIntensity`: 鏡面反射強度（0〜1）デフォルト: 0.25
+  - `specularPower`: 鏡面反射鋭さ（1〜256）デフォルト: 32
+- **バリデーション**: clamp関数による範囲制限
+
+#### 4. **デバッグGUIコントロール実装** ✅
+- **対象ファイル**: [src/components/BladeDebugScene/BladeDebugControls.tsx](../src/components/BladeDebugScene/BladeDebugControls.tsx)
+- **実装機能**:
+  - Lighting フォルダー内に4つのスライダー
+    - Ambient Intensity (0〜1.5)
+    - Specular Intensity (0〜1)
+    - Specular Power (1〜256)
+    - Directional Intensity (0〜5) - DirectionalLight強度
+  - Show Normals トグル（法線可視化）
+  - Show Axes トグル（座標軸表示）
+  - Show Shadow Helper トグル（シャドウカメラ可視化）
+
+#### 5. **デバッグヘルパー実装** ✅
+
+**BladeNormalsHelper** ([src/components/BladeDebugScene/BladeNormalsHelper.tsx](../src/components/BladeDebugScene/BladeNormalsHelper.tsx))
+- Three.jsの `VertexNormalsHelper` を使用
+- 法線ベクトルを視覚的に表示
+- リアルタイム更新（useFrame）
+- GUIから切り替え可能
+
+**AxesIndicator** ([src/components/BladeDebugScene/AxesIndicator.tsx](../src/components/BladeDebugScene/AxesIndicator.tsx))
+- 座標軸の可視化
+- X軸（赤）、Y軸（緑）、Z軸（青）
+
+**ShadowCameraHelper** ([src/components/BladeDebugScene/ShadowCameraHelper.tsx](../src/components/BladeDebugScene/ShadowCameraHelper.tsx))
+- シャドウカメラの視錐台可視化
+- 影の範囲最適化に使用
+
+#### 6. **コンポーネント分離** ✅
+
+**新しいディレクトリ構造**: `src/components/BladeDebugScene/`
+- `index.tsx` - メインシーンコンポーネント
+- `SingleBlade.tsx` - 羽板コンポーネント
+- `DebugRibbon.tsx` - リボンコンポーネント
+- `DebugWire.tsx` - ワイヤーコンポーネント
+- `BladeDebugControls.tsx` - GUIコントロール
+- `BladeNormalsHelper.tsx` - 法線可視化ヘルパー
+- `AxesIndicator.tsx` - 座標軸ヘルパー
+- `ShadowCameraHelper.tsx` - シャドウカメラヘルパー
+- `Ground.tsx` - 地面コンポーネント
+- `useBladeGeometry.ts` - ジオメトリフック
+- `utils.ts` - ユーティリティ関数
+
+**メリット**:
+- コードの可読性向上
+- 再利用性の向上
+- メンテナンス性の向上
+- 関心の分離
+
+---
+
+## 🎯 実装の成果
+
+### Before（実装前）
+- 羽板が単色フラットで立体感なし
+- 変形が視覚的に分かりにくい
+- 木材の質感が表現できていない
+
+### After（実装後）
+- **羽板に美しい陰影**:
+  - しなりに応じた自然な陰影
+  - 木材らしい質感（拡散反射+鏡面反射）
+  - リアルタイムライティング
+- **デバッグ機能充実**:
+  - GUIで全パラメータ調整可能
+  - 法線可視化で計算検証可能
+  - 座標軸・シャドウカメラ可視化
+- **コード品質向上**:
+  - コンポーネント分離で保守性向上
+  - Zustand storeで状態管理一元化
+
+---
+
+## 📊 実装チェックリスト更新
+
+### Phase 1: 現状把握 ✅ 完了
+- [x] bladeDebugVertex.glsl の変形ロジック確認
+- [x] bladeFragment.glsl の現在の実装確認
+- [x] bladeVertex.glsl との相違点洗い出し
+- [x] BladeInstances.tsx の実装確認
+
+### Phase 2: 法線再計算 ✅ 完了
+- [x] Jacobian逆転置行列による法線計算実装
+- [x] 頂点シェーダーへの統合
+- [x] ノーマル可視化シェーダーでの検証（BladeNormalsHelper）
+- [x] しなり量による法線変化の確認
+
+### Phase 3: マテリアル調整 ✅ 完了
+- [x] Lambert拡散反射の実装
+- [x] Blinn-Phong鏡面反射の実装
+- [x] uniform パラメータの追加
+- [x] bladeShadeStore（Zustand）の作成
+
+### Phase 4: デバッグ支援 ✅ 完了
+- [x] GUIライティングコントロールの追加
+- [x] ノーマル可視化モードの実装（BladeNormalsHelper）
+- [x] 座標軸の可視化（AxesIndicator）
+- [x] シャドウカメラ可視化（ShadowCameraHelper）
+- [x] パラメータのリアルタイム調整
+
+### Phase 5: 本番適用 ⏳ 次のステップ
+- [ ] BladeInstances.tsx へのシェーダー反映
+- [ ] InstancedMesh での動作確認
+- [ ] カスタムシャドウマテリアルへの法線計算反映
+- [ ] 51本構成での見栄え確認
+
+### Phase 6: パフォーマンス確認 ⏳ 次のステップ
+- [ ] FPS計測（1本/51本）
+- [ ] スクロール時のパフォーマンス確認
+- [ ] heightSegments の最適化
+- [ ] ライティングパラメータの調整
+- [ ] モバイル対応の検証
+
+---
+
+## 🔧 実装で使用した技術
+
+### 数学的手法
+- **Jacobian逆転置行列**: 変形後の法線を正確に計算
+  - しなり変形のヤコビアン J を計算
+  - 法線変換には (J⁻¹)ᵀ を使用
+  - ゼロ除算対策で数値安定性を確保
+
+### シェーダー技術
+- **ワールド空間でのライティング**: カメラに依存しない一貫した陰影
+- **Blinn-Phong**: Phongより高速な鏡面反射計算
+- **Half Vector**: `normalize(lightDir + viewDir)` で効率的に計算
+
+### React/Three.js技術
+- **Zustand Store**: グローバル状態管理
+- **useFrame**: 毎フレームのuniform更新
+- **forwardRef**: 親コンポーネントからのメッシュ参照
+- **VertexNormalsHelper**: 法線のデバッグ可視化
+
+---
+
+**ステータス**: ✅ Phase 1-4 完了 | Phase 5-6 次のステップ（51本構成への適用）
 **最終更新**: 2025年10月30日

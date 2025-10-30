@@ -3,24 +3,47 @@ uniform float uBendAmount;
 uniform float uMaxBendAngle;
 
 varying vec2 vUv;
+varying vec3 vWorldNormal;
+varying vec3 vWorldPosition;
 
 void main() {
   vUv = uv;
 
   float bendAmount = clamp(uBendAmount, 0.0, 1.0);
-  float normalizedY = clamp((position.y + (uHeight * 0.5)) / uHeight, 0.0, 1.0);
   float theta = uMaxBendAngle * bendAmount;
   vec3 transformed = position;
+  mat3 bendMatrix = mat3(1.0);
+
+  float cosAngle = 1.0;
+  float sinAngle = 0.0;
 
   if (theta > 0.0001) {
+    float normalizedY = clamp((position.y + (uHeight * 0.5)) / uHeight, 0.0, 1.0);
     float radius = uHeight / theta;
     float angle = theta * normalizedY;
-    float yFromBase = radius * sin(angle);
-    float zOffset = radius * (1.0 - cos(angle));
+    cosAngle = cos(angle);
+    sinAngle = sin(angle);
+    float yFromBase = radius * sinAngle;
+    float zOffset = radius * (1.0 - cosAngle);
 
     transformed.y = yFromBase - (uHeight * 0.5);
     transformed.z = position.z + zOffset;
   }
 
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
+  float safeCos = abs(cosAngle) > 1e-4 ? cosAngle : (cosAngle >= 0.0 ? 1e-4 : -1e-4);
+  float invCos = 1.0 / safeCos;
+  float tanAngle = sinAngle * invCos;
+
+  mat3 jacobianInvTranspose = mat3(
+    1.0,    0.0,        0.0,
+    0.0,    invCos,     0.0,
+    0.0,   -tanAngle,   1.0
+  );
+
+  vec3 bentNormal = normalize(jacobianInvTranspose * normal);
+  vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
+  vWorldPosition = worldPosition.xyz;
+  vWorldNormal = normalize(mat3(modelMatrix) * bentNormal);
+
+  gl_Position = projectionMatrix * viewMatrix * worldPosition;
 }

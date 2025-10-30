@@ -10,12 +10,14 @@ import {
   InstancedMesh,
   Matrix4,
   ShaderMaterial,
+  Vector3,
 } from "three";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { getBendAmount } from "@/utils/animationHelpers";
 import { generateUnitPositions, toSceneUnits } from "@/utils/geometryHelpers";
 import { useScrollStore } from "@/store/scrollStore";
 import { useBladeConfigStore } from "@/store/bladeConfigStore";
+import { useBladeShadeStore } from "@/store/bladeShadeStore";
 import bladeVertexShader from "@/shaders/bladeVertex.glsl";
 import bladeFragmentShader from "@/shaders/bladeFragment.glsl";
 
@@ -24,38 +26,35 @@ const BladeInstances = () => {
   const scrollProgress = useScrollStore((state) => state.progress);
   const positions = useMemo(() => generateUnitPositions(), []);
   const bladeThickness = useBladeConfigStore((state) => state.bladeThickness);
+  const ambientIntensity = useBladeShadeStore((state) => state.ambientIntensity);
+  const specularIntensity = useBladeShadeStore((state) => state.specularIntensity);
+  const specularPower = useBladeShadeStore((state) => state.specularPower);
 
   const bendAttributeRef = useRef<InstancedBufferAttribute>();
-
-  const thicknessScale = useMemo(() => {
-    const baseThickness = ANIMATION_CONFIG.blade.thickness;
-    if (baseThickness <= 0) {
-      return 1;
-    }
-    return bladeThickness / baseThickness;
-  }, [bladeThickness]);
+  const lightDirection = useMemo(() => {
+    const [x, y, z] = ANIMATION_CONFIG.lighting.mainLight.position;
+    return new Vector3(x, y, z).normalize().multiplyScalar(-1);
+  }, []);
 
   const geometry = useMemo(
     () =>
       new BoxGeometry(
         toSceneUnits(ANIMATION_CONFIG.blade.width),
         toSceneUnits(ANIMATION_CONFIG.blade.height),
-        toSceneUnits(ANIMATION_CONFIG.blade.thickness),
+        toSceneUnits(bladeThickness),
         1,
         ANIMATION_CONFIG.blade.heightSegments,
         1,
       ),
-    [],
+    [bladeThickness],
   );
 
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) {
-      return;
-    }
-    mesh.scale.set(1, 1, thicknessScale);
-    mesh.updateMatrix();
-  }, [thicknessScale]);
+  useEffect(
+    () => () => {
+      geometry.dispose();
+    },
+    [geometry],
+  );
 
   useLayoutEffect(() => {
     const attribute = new InstancedBufferAttribute(
@@ -78,18 +77,67 @@ const BladeInstances = () => {
           uColor: { value: new Color(ANIMATION_CONFIG.blade.color) },
           uHeight: { value: toSceneUnits(ANIMATION_CONFIG.blade.height) },
           uMaxBendAngle: { value: ANIMATION_CONFIG.blade.maxBendAngle },
+          uAmbientColor: { value: new Color("#ffffff") },
+          uAmbientIntensity: {
+            value: useBladeShadeStore.getState().ambientIntensity,
+          },
+          uLightColor: { value: new Color("#ffffff") },
+          uLightIntensity: {
+            value: ANIMATION_CONFIG.lighting.mainLight.intensity,
+          },
+          uLightDirection: { value: lightDirection.clone() },
+          uSpecularIntensity: {
+            value: useBladeShadeStore.getState().specularIntensity,
+          },
+          uSpecularPower: {
+            value: useBladeShadeStore.getState().specularPower,
+          },
         },
         vertexShader: bladeVertexShader,
         fragmentShader: bladeFragmentShader,
         side: DoubleSide,
       }),
-    [],
+    [lightDirection],
   );
   const materialRef = useRef(material);
+  const sharedUniformsRef = useRef(material.uniforms);
 
   useLayoutEffect(() => {
     materialRef.current = material;
+    sharedUniformsRef.current = material.uniforms;
   }, [material]);
+
+  useEffect(() => {
+    const uniforms = sharedUniformsRef.current;
+    uniforms.uAmbientIntensity.value = ambientIntensity;
+    if (materialRef.current) {
+      materialRef.current.uniformsNeedUpdate = true;
+    }
+  }, [ambientIntensity]);
+
+  useEffect(() => {
+    const uniforms = sharedUniformsRef.current;
+    uniforms.uSpecularIntensity.value = specularIntensity;
+    if (materialRef.current) {
+      materialRef.current.uniformsNeedUpdate = true;
+    }
+  }, [specularIntensity]);
+
+  useEffect(() => {
+    const uniforms = sharedUniformsRef.current;
+    uniforms.uSpecularPower.value = specularPower;
+    if (materialRef.current) {
+      materialRef.current.uniformsNeedUpdate = true;
+    }
+  }, [specularPower]);
+
+  useEffect(() => {
+    const uniforms = sharedUniformsRef.current;
+    uniforms.uLightDirection.value.copy(lightDirection);
+    if (materialRef.current) {
+      materialRef.current.uniformsNeedUpdate = true;
+    }
+  }, [lightDirection]);
 
   useLayoutEffect(() => {
     const mesh = meshRef.current;
