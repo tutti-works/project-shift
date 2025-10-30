@@ -637,42 +637,47 @@ import { DEBUG_MODE } from "@/config/debug";
 - [x] 陰影確認
 - [x] FPS計測（60fps目標）
 
-### STEP 2: サイン波アニメーション ⏳
+### STEP 2: サイン波アニメーション ✅
 
 #### 2.1 波動計算ロジック
-- [ ] `waveAnimation.ts` 作成
-- [ ] `getBendAmount` 関数実装（要件定義書5.1準拠）
-- [ ] Phase 1（中央→左右）の実装（固定パターン）
-- [ ] Phase 2（51本目→1本目）の実装（固定パターン）
+- [x] `waveAnimation.ts` 作成
+- [x] `getBendAmount` 関数実装（要件定義書5.1準拠）
+- [x] Phase 1（中央→左右）の実装（固定パターン）
+- [x] Phase 2（51本目→1本目）の実装（固定パターン）
+- [x] 遅延補正アルゴリズム実装（全ユニットが同時に完了）
 
 #### 2.2 スクロール乗数機能
-- [ ] `scrollMultiplierStore.ts` 作成
-- [ ] `scrollMultiplier` パラメータ管理（0.5〜3.0）
-- [ ] デフォルト値1.0の設定
+- [x] `scrollMultiplierStore.ts` 作成
+- [x] `scrollMultiplier` パラメータ管理（0.5〜3.0）
+- [x] デフォルト値1.0の設定
+- [x] `page.tsx`でページ高さの動的調整
 
 #### 2.3 InstancedBufferAttribute
-- [ ] `aBendAmount` attribute作成
-- [ ] ジオメトリへの追加
-- [ ] 毎フレーム更新処理
-- [ ] scrollMultiplierの適用
+- [x] `aBendAmount` attribute作成
+- [x] ジオメトリへの追加
+- [x] 毎フレーム更新処理
+- [x] scrollMultiplierの適用
 
 #### 2.4 シェーダー修正
-- [ ] `aBendAmount` attributeの受け取り
-- [ ] 既存の `uBendAmount` から切り替え
+- [x] `aBendAmount` attributeの受け取り
+- [x] 既存の `uBendAmount` から切り替え
+- [x] `bladeDebugVertexInstanced.glsl`での実装
 
 #### 2.5 GUI拡張
-- [ ] Animation Controlフォルダー追加
-- [ ] Scroll Multiplierスライダー実装（0.5〜3.0）
+- [x] Animation Controlフォルダー追加
+- [x] Scroll Range (%)スライダー実装（50〜300%）
+- [x] リアルタイム反映
 
 #### 2.6 カメラ調整
-- [ ] 51本全体が見える視点設定
-- [ ] OrbitControls調整
+- [x] 51本全体が見える視点設定
+- [x] OrbitControls調整
 
 #### 2.7 検証
-- [ ] 波の伝播確認（要件定義書5.1通り）
-- [ ] scrollMultiplier調整確認
-- [ ] 滑らかさ確認
-- [ ] FPS維持確認
+- [x] 波の伝播確認（要件定義書5.1通り）
+- [x] scrollMultiplier調整確認
+- [x] 全ユニットがアニメーション100%で完全湾曲/復帰
+- [x] 滑らかさ確認
+- [x] FPS維持確認
 
 ### STEP 3: 本番シーンへ移植 ⏳
 
@@ -746,32 +751,61 @@ void main() {
 
 ### サイン波計算の数式（要件定義書5.1準拠）
 
-**重要**: 波の伝播パターンは固定です。遅延パラメータ（waveSpeed）は使用しません。
+**重要**: 波の伝播パターンは固定です。遅延パラメータは使用しません。
+
+#### 遅延補正アルゴリズム
+
+従来の単純な遅延計算では、遠いユニットが100%に到達しない問題がありました。
+解決策として、**各ユニットの利用可能時間をスケーリング**する手法を採用しました。
 
 **Phase 1（0% → 50%）: 中央から左右へ伝播**
-```
-adjustedProgress = scrollProgress * scrollMultiplier  // スクロール乗数の適用
-phase1Progress = adjustedProgress * 2  // 0.0〜1.0に正規化
+```typescript
+// スクロール進行度の調整
+adjustedProgress = scrollProgress / scrollMultiplier  // 0.0 → 1.0
+phase1Progress = adjustedProgress * 2  // 0.0 → 1.0に正規化
+
+// 距離の正規化
 distanceFromCenter = |unitIndex - 25|
-normalizedDistance = distanceFromCenter / 25  // 0.0〜1.0
-wavePhase = phase1Progress - (normalizedDistance * 0.5)  // 固定の伝播係数
-bendAmount = sin(wavePhase * π)  // 0.0〜1.0にクランプ
+normalizedDistance = distanceFromCenter / 25  // 0.0 (center) → 1.0 (edge)
+
+// 遅延補正
+delayFactor = 0.3  // 固定値（調整不可）
+startDelay = normalizedDistance * delayFactor
+availableProgress = 1.0 - startDelay
+localProgress = (phase1Progress - startDelay) / availableProgress
+
+// ベンド量計算（サイン波イージング）
+localProgress = clamp(localProgress, 0, 1)
+bendAmount = sin(localProgress * π / 2)  // 0 → 1
 ```
 
+**重要な特性**:
+- 中央ユニット（distance=0）: `startDelay=0`, `availableProgress=1.0` → ゆっくり完了
+- 端ユニット（distance=1）: `startDelay=0.3`, `availableProgress=0.7` → 速く完了
+- **すべてのユニットが phase1Progress=1.0 で bendAmount=1.0 に到達**
+
 **Phase 2（50% → 100%）: 51本目側から1本目側へ伝播**
-```
-adjustedProgress = scrollProgress * scrollMultiplier  // スクロール乗数の適用
-phase2Progress = (adjustedProgress - 0.5) * 2  // 0.0〜1.0に正規化
+```typescript
+// 同様のアルゴリズムを適用
+phase2Progress = (adjustedProgress - 0.5) * 2
 distanceFromEnd = 50 - unitIndex
-normalizedDistance = distanceFromEnd / 50  // 0.0〜1.0
-wavePhase = phase2Progress - (normalizedDistance * 0.5)  // 固定の伝播係数
-bendAmount = 1.0 - sin(wavePhase * π)  // 1.0〜0.0にクランプ
+normalizedDistance = distanceFromEnd / 50
+
+startDelay = normalizedDistance * 0.3
+availableProgress = 1.0 - startDelay
+localProgress = (phase2Progress - startDelay) / availableProgress
+
+localProgress = clamp(localProgress, 0, 1)
+bendAmount = 1 - sin(localProgress * π / 2)  // 1 → 0
 ```
 
 **スクロール乗数の効果**:
 - `scrollMultiplier = 0.5`: 実スクロール50%でアニメーション100%到達
 - `scrollMultiplier = 1.0`: 実スクロール100%でアニメーション100%到達（デフォルト）
 - `scrollMultiplier = 2.0`: 実スクロール200%でアニメーション100%到達
+- `scrollMultiplier = 3.0`: 実スクロール300%でアニメーション100%到達
+
+**実装ファイル**: [src/utils/waveAnimation.ts](../src/utils/waveAnimation.ts)
 
 ---
 
@@ -859,8 +893,8 @@ bendAmount = 1.0 - sin(wavePhase * π)  // 1.0〜0.0にクランプ
 
 ---
 
-**ステータス**: ✅ STEP 1 完了 → 🚧 STEP 2 実装中
-**推奨実装順**: ~~STEP 1~~ → **STEP 2** → STEP 3（段階的に確実に）
+**ステータス**: ✅ STEP 1 完了 → ✅ STEP 2 完了 → 🚧 STEP 3 実装待ち
+**推奨実装順**: ~~STEP 1~~ → ~~STEP 2~~ → **STEP 3**（段階的に確実に）
 **最終更新**: 2025年10月30日
 
 ### 実装完了項目
@@ -871,6 +905,14 @@ bendAmount = 1.0 - sin(wavePhase * π)  // 1.0〜0.0にクランプ
 - 全インスタンスの同期動作確認
 - カスタムシャドウマテリアルによる正しい影の表示
 - 60fps以上のパフォーマンス確保
+
+#### STEP 2: サイン波アニメーション ✅ (完了)
+- 波動計算ロジックの実装（要件定義書5.1準拠）
+- スクロール乗数機能の実装（50%〜300%調整可能）
+- InstancedBufferAttributeによる個別ベンド量制御
+- GUIでのリアルタイム調整機能
+- ページ高さの動的調整機能
+- 全ユニットが確実に100%到達する遅延補正アルゴリズム
 
 #### 実装の経緯と解決した技術課題
 
@@ -913,9 +955,37 @@ bendAmount = 1.0 - sin(wavePhase * π)  // 1.0〜0.0にクランプ
 
 **結果**: デバッグGUIを経由したさまざまなパラメータ変更でも、51本構成が安定して動作するようになった
 
+---
+
+**6. STEP 2: サイン波アニメーションの実装（完了）**
+
+*問題*: 波の伝播計算で全ユニットがアニメーション100%時点で完全に到達しない
+- 単純な遅延計算（`wavePhase = progress - distance * 0.5`）では、遠いユニットが途中で止まる
+- 例: 端のユニットが`wavePhase = 0.5`で止まり、70%程度までしか湾曲しない
+
+*解決策*:
+- **遅延補正アルゴリズム**を実装
+- 各ユニットの開始遅延（`startDelay`）を計算
+- 利用可能時間（`availableProgress = 1.0 - startDelay`）でローカル進行度をスケール
+- これにより、遠いユニットは遅く開始するが速く完了し、全ユニットが同時に到達
+
+*追加機能*:
+- **スクロール乗数（scrollMultiplier）**の実装
+  - GUIで50%〜300%の範囲で調整可能
+  - `page.tsx`でページ高さを動的に調整（`100vh + 100vh × scrollMultiplier`）
+  - アニメーションパターンは固定、スクロール量のみ変更
+
+*検証*:
+- scrollMultiplier = 0.5〜3.0 のすべての範囲で動作確認
+- 全ユニットがアニメーション50%時点で最大湾曲(1.0)に到達
+- 全ユニットがアニメーション100%時点で垂直(0.0)に復帰
+- 波の伝播パターンが要件定義書5.1に準拠
+
+**結果**: デバッグシーンで51本のサイン波アニメーションが完璧に動作し、STEP 3（本番シーンへの移植）の準備が整った
+
 #### 次のステップ
-STEP 2: サイン波アニメーションの実装
-- `waveAnimation.ts` と `getBendAmount` 関数の実装（要件定義書5.1準拠）
-- InstancedBufferAttributeによる個別ベンド量の適用
-- `scrollMultiplierStore.ts` の作成
-- GUIでのスクロール乗数調整機能の追加（0.5〜3.0）
+STEP 3: 本番シーンへの移植
+- `BladeInstances.tsx`, `RibbonInstances.tsx`, `WireInstances.tsx` の更新
+- デバッグで確認した実装を本番シーンに反映
+- カメラワークの実装
+- パフォーマンスチューニング

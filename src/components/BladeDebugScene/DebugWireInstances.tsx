@@ -14,9 +14,11 @@ import {
   Quaternion,
   Vector3,
 } from "three";
+import { useScrollStore } from "@/store/scrollStore";
+import { getBendAmount } from "@/utils/waveAnimation";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { toSceneUnits } from "@/utils/geometryHelpers";
-import { clamp01, computeWireAttachmentPointMM } from "./utils";
+import { computeWireAttachmentPointMM } from "./utils";
 
 const TOTAL_UNITS = 51;
 const CENTER_INDEX = 25;
@@ -45,6 +47,7 @@ const DebugWireInstances = ({
   const tempQuat = useMemo(() => new Quaternion(), []);
   const basePosition = useMemo(() => new Vector3(), []);
   const baseScale = useMemo(() => new Vector3(1, 1, 1), []);
+  const scrollProgress = useScrollStore((state) => state.progress);
 
   const geometry = useMemo(
     () =>
@@ -81,26 +84,36 @@ const DebugWireInstances = ({
       return;
     }
 
-    const bendAmount = clamp01(bendAmountRef.current);
-    const { point } = computeWireAttachmentPointMM(bendAmount);
-
-    tempEnd.set(0, toSceneUnits(point.y), toSceneUnits(point.z));
-    tempDir.copy(tempEnd).sub(anchorBase);
-
-    const length = tempDir.length();
-    mesh.visible = length > 1e-6;
-    if (!mesh.visible) {
-      return;
-    }
-
-    tempMid.copy(anchorBase).add(tempEnd).multiplyScalar(0.5);
-    tempQuat.setFromUnitVectors(up, tempDir.normalize());
-
-    basePosition.copy(tempMid);
+    const progress = Math.min(Math.max(scrollProgress, 0), 1);
     const thicknessScene = toSceneUnits(Math.max(wireThicknessRef.current, 0.1));
-    baseScale.set(thicknessScene, length, thicknessScene);
+    let anyVisible = false;
+    let centerBend = 0;
 
     for (let i = 0; i < TOTAL_UNITS; i++) {
+      const bendAmount = getBendAmount(i, progress);
+      if (i === CENTER_INDEX) {
+        centerBend = bendAmount;
+      }
+
+      const { point } = computeWireAttachmentPointMM(bendAmount);
+      tempEnd.set(0, toSceneUnits(point.y), toSceneUnits(point.z));
+      tempDir.copy(tempEnd).sub(anchorBase);
+
+      const length = tempDir.length();
+      const hasLength = length > 1e-6;
+      if (hasLength) {
+        anyVisible = true;
+        tempDir.normalize();
+        tempQuat.setFromUnitVectors(up, tempDir);
+      } else {
+        tempQuat.identity();
+      }
+
+      tempMid.copy(anchorBase).add(tempEnd).multiplyScalar(0.5);
+      basePosition.copy(tempMid);
+      const scaleY = hasLength ? Math.max(length, 1e-4) : 1e-4;
+      baseScale.set(thicknessScene, scaleY, thicknessScene);
+
       const xOffset = toSceneUnits((i - CENTER_INDEX) * UNIT_PITCH_MM);
       tempInstanceObject.position.set(
         basePosition.x + xOffset,
@@ -113,7 +126,9 @@ const DebugWireInstances = ({
       mesh.setMatrixAt(i, tempInstanceObject.matrix);
     }
 
+    mesh.visible = anyVisible;
     mesh.instanceMatrix.needsUpdate = true;
+    bendAmountRef.current = centerBend;
   });
 
   return (

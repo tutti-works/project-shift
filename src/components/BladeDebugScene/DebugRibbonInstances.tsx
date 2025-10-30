@@ -22,8 +22,10 @@ import {
   Vector3,
 } from "three";
 import { useRibbonConfigStore } from "@/store/ribbonConfigStore";
+import { useScrollStore } from "@/store/scrollStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { toSceneUnits } from "@/utils/geometryHelpers";
+import { getBendAmount } from "@/utils/waveAnimation";
 import ribbonVertexShader from "@/shaders/ribbonVertexInstanced.glsl";
 import ribbonFragmentShader from "@/shaders/ribbonFragment.glsl";
 import { clamp01, computeBladePointMM } from "./utils";
@@ -245,6 +247,7 @@ uniform float uBendAmount;`,
 
   const twistAngleAtRest = useRibbonConfigStore((state) => state.twistAngleAtRest);
   const twistAngleAtMax = useRibbonConfigStore((state) => state.twistAngleAtMax);
+  const scrollProgress = useScrollStore((state) => state.progress);
   const baseHeightScene = useMemo(
     () => toSceneUnits(ANIMATION_CONFIG.ribbon.height),
     [],
@@ -257,35 +260,43 @@ uniform float uBendAmount;`,
       return;
     }
 
-    const bendAmount = clamp01(bendAmountRef.current);
     const uniforms = sharedUniformsRef.current;
-    uniforms.uBendAmount.value = bendAmount;
     uniforms.uTwistAngleAtRest.value = twistAngleAtRest;
     uniforms.uTwistAngleAtMax.value = twistAngleAtMax;
 
-    const tipPoint = computeBladePointMM(bendAmount, 1);
-    tempEnd.set(0, toSceneUnits(tipPoint.y), toSceneUnits(tipPoint.z));
-    tempDir.copy(tempEnd).sub(anchorBase);
-
-    const length = tempDir.length();
-    mesh.visible = length > 1e-6;
-    if (!mesh.visible) {
-      return;
-    }
-
-    tempMid.copy(anchorBase).add(tempEnd).multiplyScalar(0.5);
-    tempQuat.setFromUnitVectors(up, tempDir.normalize());
-    const scaleY = Math.max(length / baseHeightScene, 1e-4);
-
-    basePosition.copy(tempMid);
-    baseScale.set(1, scaleY, 1);
-
+    const progress = clamp01(scrollProgress);
     const twistAttribute = twistAttributeRef.current;
+    let anyVisible = false;
+    let centerBend = 0;
 
     for (let i = 0; i < TOTAL_UNITS; i++) {
+      const bendAmount = getBendAmount(i, progress);
       if (twistAttribute) {
         twistAttribute.setX(i, bendAmount);
       }
+      if (i === CENTER_INDEX) {
+        centerBend = bendAmount;
+      }
+
+      const tipPoint = computeBladePointMM(bendAmount, 1);
+      tempEnd.set(0, toSceneUnits(tipPoint.y), toSceneUnits(tipPoint.z));
+      tempDir.copy(tempEnd).sub(anchorBase);
+
+      const length = tempDir.length();
+      const hasLength = length > 1e-6;
+      if (hasLength) {
+        anyVisible = true;
+        tempDir.normalize();
+        tempQuat.setFromUnitVectors(up, tempDir);
+      } else {
+        tempQuat.identity();
+      }
+
+      tempMid.copy(anchorBase).add(tempEnd).multiplyScalar(0.5);
+      basePosition.copy(tempMid);
+      const scaleY = hasLength ? Math.max(length / baseHeightScene, 1e-4) : 1e-4;
+      baseScale.set(1, scaleY, 1);
+
       const xOffset = toSceneUnits((i - CENTER_INDEX) * UNIT_PITCH_MM);
       tempInstanceObject.position.set(
         basePosition.x + xOffset,
@@ -302,8 +313,11 @@ uniform float uBendAmount;`,
       twistAttribute.needsUpdate = true;
     }
 
+    mesh.visible = anyVisible;
     mesh.instanceMatrix.needsUpdate = true;
     materialInstance.uniformsNeedUpdate = true;
+    uniforms.uBendAmount.value = centerBend;
+    bendAmountRef.current = centerBend;
   });
 
   return (

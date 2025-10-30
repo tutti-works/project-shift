@@ -23,7 +23,6 @@ import {
 } from "three";
 import { useBladeShadeStore } from "@/store/bladeShadeStore";
 import { useScrollStore } from "@/store/scrollStore";
-import { useWaveConfigStore } from "@/store/waveConfigStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { toSceneUnits } from "@/utils/geometryHelpers";
 import { getBendAmount } from "@/utils/waveAnimation";
@@ -59,7 +58,6 @@ const DebugBladeInstances = ({
   const specularIntensity = useBladeShadeStore((state) => state.specularIntensity);
   const specularPower = useBladeShadeStore((state) => state.specularPower);
   const scrollProgress = useScrollStore((state) => state.progress);
-  const waveSpeed = useWaveConfigStore((state) => state.waveSpeed);
   const bendAmounts = useMemo(
     () => new InstancedBufferAttribute(new Float32Array(TOTAL_UNITS), 1),
     [],
@@ -284,7 +282,7 @@ ${bendChunkForShader}
     let centerBend = 0;
 
     for (let i = 0; i < TOTAL_UNITS; i++) {
-      const bendAmount = getBendAmount(i, progress, waveSpeed);
+      const bendAmount = getBendAmount(i, progress);
       bendAmounts.setX(i, bendAmount);
       if (i === CENTER_INDEX) {
         centerBend = bendAmount;

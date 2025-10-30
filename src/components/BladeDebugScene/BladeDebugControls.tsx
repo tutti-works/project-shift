@@ -4,7 +4,7 @@ import { GUI } from "lil-gui";
 import { useBladeConfigStore } from "@/store/bladeConfigStore";
 import { useRibbonConfigStore } from "@/store/ribbonConfigStore";
 import { useBladeShadeStore } from "@/store/bladeShadeStore";
-import { useWaveConfigStore } from "@/store/waveConfigStore";
+import { useScrollMultiplierStore } from "@/store/scrollMultiplierStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { degToRad, radToDeg } from "./utils";
 
@@ -49,8 +49,8 @@ const BladeDebugControls = ({
   const setAmbientIntensity = useBladeShadeStore((state) => state.setAmbientIntensity);
   const setSpecularIntensity = useBladeShadeStore((state) => state.setSpecularIntensity);
   const setSpecularPower = useBladeShadeStore((state) => state.setSpecularPower);
-  const waveSpeed = useWaveConfigStore((state) => state.waveSpeed);
-  const setWaveSpeed = useWaveConfigStore((state) => state.setWaveSpeed);
+  const scrollMultiplier = useScrollMultiplierStore((state) => state.scrollMultiplier);
+  const setScrollMultiplier = useScrollMultiplierStore((state) => state.setScrollMultiplier);
 
   const guiRef = useRef<GUI | null>(null);
   const guiParamsRef = useRef({
@@ -66,7 +66,7 @@ const BladeDebugControls = ({
     showAxes,
     showShadowHelper,
     use51Instances,
-    waveSpeed,
+    scrollRangePercent: scrollMultiplier * 100,
   });
   const guiControllersRef = useRef<{
     wireThickness?: DebugController;
@@ -81,7 +81,7 @@ const BladeDebugControls = ({
     showAxes?: DebugController;
     showShadowHelper?: DebugController;
     use51Instances?: DebugController;
-    waveSpeed?: DebugController;
+    scrollRangePercent?: DebugController;
   }>({});
 
   useEffect(() => {
@@ -104,7 +104,7 @@ const BladeDebugControls = ({
     params.showNormals = showNormals;
     params.showAxes = showAxes;
     params.showShadowHelper = showShadowHelper;
-    params.waveSpeed = useWaveConfigStore.getState().waveSpeed;
+    params.scrollRangePercent = useScrollMultiplierStore.getState().scrollMultiplier * 100;
     params.use51Instances = use51Instances;
 
     const wireController = gui
@@ -208,17 +208,17 @@ const BladeDebugControls = ({
         onToggle51Instances(value);
       });
 
-    const waveFolder = gui.addFolder("Wave Animation");
+    const scrollFolder = gui.addFolder("Scroll Animation");
 
-    const waveSpeedController = waveFolder
-      .add(params, "waveSpeed", 0.01, 0.2, 0.01)
-      .name("Wave Speed")
+    const scrollRangeController = scrollFolder
+      .add(params, "scrollRangePercent", 50, 300, 10)
+      .name("Scroll % for 100% Anim")
       .onChange((value: number) => {
-        guiParamsRef.current.waveSpeed = value;
-        setWaveSpeed(value);
+        guiParamsRef.current.scrollRangePercent = value;
+        setScrollMultiplier(value / 100);
       });
 
-    waveFolder.open();
+    scrollFolder.open();
     lightingFolder.open();
 
     guiControllersRef.current = {
@@ -234,7 +234,7 @@ const BladeDebugControls = ({
       showAxes: showAxesController,
       showShadowHelper: showShadowHelperController,
       use51Instances: instancesController,
-      waveSpeed: waveSpeedController,
+      scrollRangePercent: scrollRangeController,
     };
 
     gui.domElement.style.zIndex = "20";
@@ -305,9 +305,9 @@ const BladeDebugControls = ({
   }, [use51Instances]);
 
   useEffect(() => {
-    guiParamsRef.current.waveSpeed = waveSpeed;
-    updateDisplay(guiControllersRef.current.waveSpeed);
-  }, [waveSpeed]);
+    guiParamsRef.current.scrollRangePercent = scrollMultiplier * 100;
+    updateDisplay(guiControllersRef.current.scrollRangePercent);
+  }, [scrollMultiplier]);
 
   return null;
 };
