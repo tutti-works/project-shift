@@ -41,18 +41,11 @@ void main() {
 
   vec3 bentNormal = normalize(jacobianInvTranspose * normal);
 
-#ifdef USE_INSTANCING
   mat4 modelInstanceMatrix = modelMatrix * instanceMatrix;
   vec4 worldPosition = modelInstanceMatrix * vec4(transformed, 1.0);
   vWorldPosition = worldPosition.xyz;
   vWorldNormal = normalize(mat3(modelInstanceMatrix) * bentNormal);
   vec4 viewPosition = viewMatrix * worldPosition;
-#else
-  vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
-  vWorldPosition = worldPosition.xyz;
-  vWorldNormal = normalize(mat3(modelMatrix) * bentNormal);
-  vec4 viewPosition = viewMatrix * worldPosition;
-#endif
 
   gl_Position = projectionMatrix * viewPosition;
 }

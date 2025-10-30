@@ -18,6 +18,8 @@ type BladeDebugControlsProps = {
   onToggleAxes: (value: boolean) => void;
   showShadowHelper: boolean;
   onToggleShadowHelper: (value: boolean) => void;
+  use51Instances: boolean;
+  onToggle51Instances: (value: boolean) => void;
 };
 
 const BladeDebugControls = ({
@@ -29,6 +31,8 @@ const BladeDebugControls = ({
   onToggleAxes,
   showShadowHelper,
   onToggleShadowHelper,
+  use51Instances,
+  onToggle51Instances,
 }: BladeDebugControlsProps) => {
   const bladeThickness = useBladeConfigStore((state) => state.bladeThickness);
   const setBladeThickness = useBladeConfigStore((state) => state.setBladeThickness);
@@ -58,6 +62,7 @@ const BladeDebugControls = ({
     showNormals,
     showAxes,
     showShadowHelper,
+    use51Instances,
   });
   const guiControllersRef = useRef<{
     wireThickness?: DebugController;
@@ -71,6 +76,7 @@ const BladeDebugControls = ({
     showNormals?: DebugController;
     showAxes?: DebugController;
     showShadowHelper?: DebugController;
+    use51Instances?: DebugController;
   }>({});
 
   useEffect(() => {
@@ -93,6 +99,7 @@ const BladeDebugControls = ({
     params.showNormals = showNormals;
     params.showAxes = showAxes;
     params.showShadowHelper = showShadowHelper;
+    params.use51Instances = use51Instances;
 
     const wireController = gui
       .add(params, "wireThickness", 0.5, 20, 0.1)
@@ -187,6 +194,14 @@ const BladeDebugControls = ({
         onToggleShadowHelper(value);
       });
 
+    const instancesController = gui
+      .add(params, "use51Instances")
+      .name("Enable 51 Instances")
+      .onChange((value: boolean) => {
+        guiParamsRef.current.use51Instances = value;
+        onToggle51Instances(value);
+      });
+
     lightingFolder.open();
 
     guiControllersRef.current = {
@@ -201,6 +216,7 @@ const BladeDebugControls = ({
       showNormals: showNormalsController,
       showAxes: showAxesController,
       showShadowHelper: showShadowHelperController,
+      use51Instances: instancesController,
     };
 
     gui.domElement.style.zIndex = "20";
@@ -264,6 +280,11 @@ const BladeDebugControls = ({
     guiParamsRef.current.showShadowHelper = showShadowHelper;
     updateDisplay(guiControllersRef.current.showShadowHelper);
   }, [showShadowHelper]);
+
+  useEffect(() => {
+    guiParamsRef.current.use51Instances = use51Instances;
+    updateDisplay(guiControllersRef.current.use51Instances);
+  }, [use51Instances]);
 
   return null;
 };

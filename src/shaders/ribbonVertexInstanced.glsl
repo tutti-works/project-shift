@@ -3,19 +3,14 @@ uniform float uTwistAngleAtRest;
 uniform float uTwistAngleAtMax;
 uniform float uBendAmount;
 
-#ifdef USE_INSTANCING
 attribute float aTwistAmount;
-#endif
 
 varying vec2 vUv;
 
 void main() {
   vUv = uv;
 
-  float bendAmount = clamp(uBendAmount, 0.0, 1.0);
-#ifdef USE_INSTANCING
-  bendAmount = clamp(aTwistAmount, 0.0, 1.0);
-#endif
+  float bendAmount = clamp(aTwistAmount, 0.0, 1.0);
   float normalizedY = clamp((position.y + (uHeight * 0.5)) / uHeight, 0.0, 1.0);
   float rootAngle = mix(uTwistAngleAtRest, uTwistAngleAtMax, bendAmount);
   float twistAngle = rootAngle * (1.0 - normalizedY);
@@ -27,14 +22,9 @@ void main() {
   transformed.x = position.x * cosTheta - position.z * sinTheta;
   transformed.z = position.x * sinTheta + position.z * cosTheta;
 
-#ifdef USE_INSTANCING
   mat4 modelInstanceMatrix = modelMatrix * instanceMatrix;
   vec4 worldPosition = modelInstanceMatrix * vec4(transformed, 1.0);
   vec4 viewPosition = viewMatrix * worldPosition;
-#else
-  vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
-  vec4 viewPosition = viewMatrix * worldPosition;
-#endif
 
   gl_Position = projectionMatrix * viewPosition;
 }

@@ -16,6 +16,9 @@ import ShadowCameraHelper from "./ShadowCameraHelper";
 import BladeDebugControls from "./BladeDebugControls";
 import AxesIndicator from "./AxesIndicator";
 import BladeNormalsHelper from "./BladeNormalsHelper";
+import DebugBladeInstances from "./DebugBladeInstances";
+import DebugRibbonInstances from "./DebugRibbonInstances";
+import DebugWireInstances from "./DebugWireInstances";
 
 const BladeDebugScene = () => {
   const directionalLightRef = useRef<DirectionalLight | null>(null);
@@ -25,6 +28,7 @@ const BladeDebugScene = () => {
   const [showNormals, setShowNormals] = useState(false);
   const [showAxes, setShowAxes] = useState(true);
   const [showShadowHelper, setShowShadowHelper] = useState(true);
+  const [use51Instances, setUse51Instances] = useState(false);
 
   const bladeThickness = useBladeConfigStore((state) => state.bladeThickness);
   const ambientLightIntensity = useBladeShadeStore((state) => state.ambientIntensity);
@@ -48,6 +52,8 @@ const BladeDebugScene = () => {
         onToggleAxes={setShowAxes}
         showShadowHelper={showShadowHelper}
         onToggleShadowHelper={setShowShadowHelper}
+        use51Instances={use51Instances}
+        onToggle51Instances={setUse51Instances}
       />
       <Canvas
         className="h-full w-full"
@@ -95,19 +101,36 @@ const BladeDebugScene = () => {
         />
 
         <Suspense fallback={null}>
-         <SingleBlade
-           ref={singleBladeRef}
-           bendAmountRef={bendAmountRef}
-           bladeThickness={bladeThickness}
-           lightRef={directionalLightRef}
-           name="single-blade"
-         />
-          {showNormals ? <BladeNormalsHelper meshRef={singleBladeRef} size={0.2} /> : null}
-          <DebugRibbon bendAmountRef={bendAmountRef} />
-          <DebugWire
-            bendAmountRef={bendAmountRef}
-            wireThicknessRef={wireThicknessRef}
-          />
+          {use51Instances ? (
+            <>
+              <DebugBladeInstances
+                bendAmountRef={bendAmountRef}
+                bladeThickness={bladeThickness}
+                lightRef={directionalLightRef}
+              />
+              <DebugRibbonInstances bendAmountRef={bendAmountRef} />
+              <DebugWireInstances
+                bendAmountRef={bendAmountRef}
+                wireThicknessRef={wireThicknessRef}
+              />
+            </>
+          ) : (
+            <>
+              <SingleBlade
+                ref={singleBladeRef}
+                bendAmountRef={bendAmountRef}
+                bladeThickness={bladeThickness}
+                lightRef={directionalLightRef}
+                name="single-blade"
+              />
+              {showNormals ? <BladeNormalsHelper meshRef={singleBladeRef} size={0.2} /> : null}
+              <DebugRibbon bendAmountRef={bendAmountRef} />
+              <DebugWire
+                bendAmountRef={bendAmountRef}
+                wireThicknessRef={wireThicknessRef}
+              />
+            </>
+          )}
           <Ground />
         </Suspense>
       </Canvas>
