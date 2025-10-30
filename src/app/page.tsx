@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useMemo, useEffect } from "react";
 import ScrollController from "@/components/ScrollController";
+import { ScrollIndicator } from "@/components/ScrollIndicator";
 import { useScrollMultiplierStore } from "@/store/scrollMultiplierStore";
 
 // Toggle between the production and debug scenes
@@ -76,6 +77,8 @@ const Home = () => {
           </h2>
         </section>
       </article>
+
+      {!USE_DEBUG_SCENE && <ScrollIndicator />}
     </main>
   );
 };
