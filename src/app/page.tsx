@@ -5,9 +5,8 @@ import { useMemo, useEffect } from "react";
 import ScrollController from "@/components/ScrollController";
 import { useScrollMultiplierStore } from "@/store/scrollMultiplierStore";
 
-// 本番シーンとデバッグシーンの切り替え
-const USE_DEBUG_SCENE = false; // true: デバッグシーン, false: 本番シーン
-
+// Toggle between the production and debug scenes
+const USE_DEBUG_SCENE = false; // true: debug scene, false: production scene
 const Scene = dynamic(
   () => USE_DEBUG_SCENE
     ? import("@/components/BladeDebugScene")
@@ -22,20 +21,27 @@ const Home = () => {
     (state) => state.scrollMultiplier,
   );
 
-  // 本番シーンではスクロールバーを非表示
+  // Hide the scrollbar in the production scene
   useEffect(() => {
-    if (!USE_DEBUG_SCENE) {
-      document.body.classList.add("hide-scrollbar");
-    } else {
-      document.body.classList.remove("hide-scrollbar");
-    }
+    const targets: HTMLElement[] = [document.body, document.documentElement];
+    const shouldHideScrollbar = !USE_DEBUG_SCENE;
+
+    targets.forEach((target) => {
+      if (shouldHideScrollbar) {
+        target.classList.add("hide-scrollbar");
+      } else {
+        target.classList.remove("hide-scrollbar");
+      }
+    });
 
     return () => {
-      document.body.classList.remove("hide-scrollbar");
+      targets.forEach((target) => {
+        target.classList.remove("hide-scrollbar");
+      });
     };
-  }, []);
+  }, [USE_DEBUG_SCENE]);
 
-  // デバッグシーンではscrollMultiplierを使用、本番シーンでは固定
+  // Use scrollMultiplier in the debug scene and a fixed height in production
   const pageStyle = useMemo(() => {
     if (USE_DEBUG_SCENE) {
       const baseHeight = 100;

@@ -13,14 +13,24 @@ body {
     "Segoe UI", sans-serif;
 }
 
-/* スクロールバーを非表示（本番シーン用） */
+/* Hide scrollbars in the production scene */
+html.hide-scrollbar,
 body.hide-scrollbar {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
 }
 
+html.hide-scrollbar::-webkit-scrollbar,
 body.hide-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
+}
+
+/* Disable text selection in the production scene */
+body.hide-scrollbar {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 html.lenis-ready {
