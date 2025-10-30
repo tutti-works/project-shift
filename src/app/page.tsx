@@ -5,6 +5,7 @@ import { useMemo, useEffect } from "react";
 import ScrollController from "@/components/ScrollController";
 import { ScrollIndicator } from "@/components/ScrollIndicator";
 import { useScrollMultiplierStore } from "@/store/scrollMultiplierStore";
+import { useMouseStore } from "@/store/mouseStore";
 
 // Toggle between the production and debug scenes
 const USE_DEBUG_SCENE = false; // true: debug scene, false: production scene
@@ -21,6 +22,22 @@ const Home = () => {
   const scrollMultiplier = useScrollMultiplierStore(
     (state) => state.scrollMultiplier,
   );
+  const setMousePosition = useMouseStore((state) => state.setMousePosition);
+
+  // Track mouse position for camera orbit effect
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      // Normalize to -1 to 1 range
+      const x = (event.clientX / window.innerWidth) * 2 - 1;
+      const y = (event.clientY / window.innerHeight) * 2 - 1;
+      setMousePosition(x, y);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, [setMousePosition]);
 
   // Hide the scrollbar in the production scene
   useEffect(() => {
