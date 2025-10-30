@@ -13,10 +13,10 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
 export const useScrollMultiplierStore = create<ScrollMultiplierState>((set) => ({
-  scrollMultiplier: 1.0,
+  scrollMultiplier: 2.0, // Default: 200% scroll range
   setScrollMultiplier: (value) =>
     set(() => ({
-      scrollMultiplier: Number.isFinite(value) ? clamp(value, 0.5, 3.0) : 1.0,
+      scrollMultiplier: Number.isFinite(value) ? clamp(value, 0.5, 3.0) : 2.0,
     })),
 }));
 

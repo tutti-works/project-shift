@@ -15,9 +15,11 @@ const MAX_TWIST_ANGLE = Math.PI * 2;
 const clampTwist = (value: number) =>
   Math.min(Math.max(value, MIN_TWIST_ANGLE), MAX_TWIST_ANGLE);
 
+const degToRad = (deg: number) => (deg * Math.PI) / 180;
+
 export const useRibbonConfigStore = create<RibbonConfigState>((set) => ({
-  twistAngleAtRest: 0,
-  twistAngleAtMax: clampTwist(maxTwistAngle),
+  twistAngleAtRest: degToRad(-120), // Default: -120 degrees
+  twistAngleAtMax: degToRad(360), // Default: 360 degrees
   setTwistAngleAtRest: (value: number) =>
     set((state) => {
       const next = clampTwist(value);

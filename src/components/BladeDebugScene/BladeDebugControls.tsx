@@ -5,6 +5,7 @@ import { useBladeConfigStore } from "@/store/bladeConfigStore";
 import { useRibbonConfigStore } from "@/store/ribbonConfigStore";
 import { useBladeShadeStore } from "@/store/bladeShadeStore";
 import { useScrollMultiplierStore } from "@/store/scrollMultiplierStore";
+import { useCameraConfigStore } from "@/store/cameraConfigStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { degToRad, radToDeg } from "./utils";
 
@@ -52,6 +53,14 @@ const BladeDebugControls = ({
   const scrollMultiplier = useScrollMultiplierStore((state) => state.scrollMultiplier);
   const setScrollMultiplier = useScrollMultiplierStore((state) => state.setScrollMultiplier);
 
+  const targetHeight = useCameraConfigStore((state) => state.targetHeight);
+  const orbitCenterHeight = useCameraConfigStore((state) => state.orbitCenterHeight);
+  const cameraDistance = useCameraConfigStore((state) => state.cameraDistance);
+  const currentPosition = useCameraConfigStore((state) => state.currentPosition);
+  const setTargetHeight = useCameraConfigStore((state) => state.setTargetHeight);
+  const setOrbitCenterHeight = useCameraConfigStore((state) => state.setOrbitCenterHeight);
+  const setCameraDistance = useCameraConfigStore((state) => state.setCameraDistance);
+
   const guiRef = useRef<GUI | null>(null);
   const guiParamsRef = useRef({
     wireThickness: 10,
@@ -67,6 +76,12 @@ const BladeDebugControls = ({
     showShadowHelper,
     use51Instances,
     scrollRangePercent: scrollMultiplier * 100,
+    targetHeight,
+    orbitCenterHeight,
+    cameraDistance,
+    cameraPosX: 0,
+    cameraPosY: 0,
+    cameraPosZ: 0,
   });
   const guiControllersRef = useRef<{
     wireThickness?: DebugController;
@@ -82,6 +97,12 @@ const BladeDebugControls = ({
     showShadowHelper?: DebugController;
     use51Instances?: DebugController;
     scrollRangePercent?: DebugController;
+    targetHeight?: DebugController;
+    orbitCenterHeight?: DebugController;
+    cameraDistance?: DebugController;
+    cameraPosX?: DebugController;
+    cameraPosY?: DebugController;
+    cameraPosZ?: DebugController;
   }>({});
 
   useEffect(() => {
@@ -219,6 +240,54 @@ const BladeDebugControls = ({
       });
 
     scrollFolder.open();
+
+    // Camera Controls
+    const cameraFolder = gui.addFolder("Camera");
+
+    const targetHeightController = cameraFolder
+      .add(params, "targetHeight", 0, 5, 0.1)
+      .name("Target Height")
+      .onChange((value: number) => {
+        guiParamsRef.current.targetHeight = value;
+        setTargetHeight(value);
+      });
+
+    const orbitCenterHeightController = cameraFolder
+      .add(params, "orbitCenterHeight", 0, 5, 0.1)
+      .name("Orbit Center Height")
+      .onChange((value: number) => {
+        guiParamsRef.current.orbitCenterHeight = value;
+        setOrbitCenterHeight(value);
+      });
+
+    const cameraDistanceController = cameraFolder
+      .add(params, "cameraDistance", 1, 20, 0.5)
+      .name("Camera Distance")
+      .onChange((value: number) => {
+        guiParamsRef.current.cameraDistance = value;
+        setCameraDistance(value);
+      });
+
+    // Camera Position Display (Read-only)
+    const cameraPosFolder = cameraFolder.addFolder("Current Position");
+    const cameraPosXController = cameraPosFolder
+      .add(params, "cameraPosX")
+      .name("X")
+      .disable()
+      .listen();
+    const cameraPosYController = cameraPosFolder
+      .add(params, "cameraPosY")
+      .name("Y")
+      .disable()
+      .listen();
+    const cameraPosZController = cameraPosFolder
+      .add(params, "cameraPosZ")
+      .name("Z")
+      .disable()
+      .listen();
+
+    cameraPosFolder.open();
+    cameraFolder.open();
     lightingFolder.open();
 
     guiControllersRef.current = {
@@ -235,6 +304,12 @@ const BladeDebugControls = ({
       showShadowHelper: showShadowHelperController,
       use51Instances: instancesController,
       scrollRangePercent: scrollRangeController,
+      targetHeight: targetHeightController,
+      orbitCenterHeight: orbitCenterHeightController,
+      cameraDistance: cameraDistanceController,
+      cameraPosX: cameraPosXController,
+      cameraPosY: cameraPosYController,
+      cameraPosZ: cameraPosZController,
     };
 
     gui.domElement.style.zIndex = "20";
@@ -308,6 +383,28 @@ const BladeDebugControls = ({
     guiParamsRef.current.scrollRangePercent = scrollMultiplier * 100;
     updateDisplay(guiControllersRef.current.scrollRangePercent);
   }, [scrollMultiplier]);
+
+  useEffect(() => {
+    guiParamsRef.current.targetHeight = targetHeight;
+    updateDisplay(guiControllersRef.current.targetHeight);
+  }, [targetHeight]);
+
+  useEffect(() => {
+    guiParamsRef.current.orbitCenterHeight = orbitCenterHeight;
+    updateDisplay(guiControllersRef.current.orbitCenterHeight);
+  }, [orbitCenterHeight]);
+
+  useEffect(() => {
+    guiParamsRef.current.cameraDistance = cameraDistance;
+    updateDisplay(guiControllersRef.current.cameraDistance);
+  }, [cameraDistance]);
+
+  // Update camera position display in real-time
+  useEffect(() => {
+    guiParamsRef.current.cameraPosX = currentPosition.x;
+    guiParamsRef.current.cameraPosY = currentPosition.y;
+    guiParamsRef.current.cameraPosZ = currentPosition.z;
+  }, [currentPosition]);
 
   return null;
 };

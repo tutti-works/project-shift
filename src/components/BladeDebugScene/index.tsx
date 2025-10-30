@@ -6,6 +6,7 @@ import { OrbitControls } from "@react-three/drei";
 import { DirectionalLight, Mesh } from "three";
 import { useBladeConfigStore } from "@/store/bladeConfigStore";
 import { useBladeShadeStore } from "@/store/bladeShadeStore";
+import { useCameraConfigStore } from "@/store/cameraConfigStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { toSceneUnits } from "@/utils/geometryHelpers";
 import SingleBlade from "./SingleBlade";
@@ -19,6 +20,8 @@ import BladeNormalsHelper from "./BladeNormalsHelper";
 import DebugBladeInstances from "./DebugBladeInstances";
 import DebugRibbonInstances from "./DebugRibbonInstances";
 import DebugWireInstances from "./DebugWireInstances";
+import CameraPositionUpdater from "./CameraPositionUpdater";
+import CameraController from "./CameraController";
 
 const BladeDebugScene = () => {
   const directionalLightRef = useRef<DirectionalLight | null>(null);
@@ -26,34 +29,45 @@ const BladeDebugScene = () => {
   const bendAmountRef = useRef<number>(0);
   const wireThicknessRef = useRef<number>(10);
   const [showNormals, setShowNormals] = useState(false);
-  const [showAxes, setShowAxes] = useState(true);
-  const [showShadowHelper, setShowShadowHelper] = useState(true);
-  const [use51Instances, setUse51Instances] = useState(false);
+  const [showAxes, setShowAxes] = useState(false);
+  const [showShadowHelper, setShowShadowHelper] = useState(false);
+  const [use51Instances, setUse51Instances] = useState(true);
 
   const bladeThickness = useBladeConfigStore((state) => state.bladeThickness);
   const ambientLightIntensity = useBladeShadeStore((state) => state.ambientIntensity);
 
+  const targetHeight = useCameraConfigStore((state) => state.targetHeight);
+  const orbitCenterHeight = useCameraConfigStore((state) => state.orbitCenterHeight);
+  const cameraDistance = useCameraConfigStore((state) => state.cameraDistance);
+
   const bladeHeight = toSceneUnits(ANIMATION_CONFIG.blade.height);
-  const cameraDistance = bladeHeight * 1.8;
-  const cameraHeight = bladeHeight * 0.75;
+
+  // Camera target position (what the camera looks at)
   const orbitTarget = useMemo(
-    () => [0, bladeHeight * 0.5, 0] as const,
-    [bladeHeight],
+    () => [0, bladeHeight * targetHeight, 0] as const,
+    [bladeHeight, targetHeight],
+  );
+
+  // Camera initial position
+  const cameraPosition = useMemo(
+    () => [0, bladeHeight * orbitCenterHeight, bladeHeight * cameraDistance] as const,
+    [bladeHeight, orbitCenterHeight, cameraDistance],
   );
   const camera51Config = useMemo(() => {
     if (!use51Instances) {
       return null;
     }
 
-    const totalWidth = toSceneUnits(51 * 120);
-    const distance = Math.max(totalWidth * 0.8, bladeHeight * 2.5);
-    const height = bladeHeight * 0.75;
+    // Use camera settings from store
+    const distance = bladeHeight * cameraDistance;
+    const height = bladeHeight * orbitCenterHeight;
+    const targetY = bladeHeight * targetHeight;
 
     return {
       position: [0, height, distance] as const,
-      target: [0, bladeHeight * 0.5, 0] as const,
+      target: [0, targetY, 0] as const,
     };
-  }, [bladeHeight, use51Instances]);
+  }, [bladeHeight, use51Instances, cameraDistance, orbitCenterHeight, targetHeight]);
 
   return (
     <>
@@ -81,7 +95,7 @@ const BladeDebugScene = () => {
                 far: 200,
               }
             : {
-                position: [0, cameraHeight, cameraDistance],
+                position: cameraPosition,
                 fov: 40,
                 near: 0.1,
                 far: 100,
@@ -94,12 +108,14 @@ const BladeDebugScene = () => {
         }}
       >
         <color attach="background" args={["#050505"]} />
+        <CameraPositionUpdater />
+        <CameraController use51Instances={use51Instances} />
         <ambientLight intensity={ambientLightIntensity} />
         {showAxes ? <AxesIndicator size={0.5} /> : null}
         <directionalLight
           ref={directionalLightRef}
           position={[3, 5, 2]}
-          intensity={1.4}
+          intensity={1.8}
           castShadow
           shadow-mapSize-width={1024}
           shadow-mapSize-height={1024}
