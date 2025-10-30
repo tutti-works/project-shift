@@ -4,6 +4,7 @@ import { Suspense, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import ShiftStructure from "@/components/ShiftStructure";
 import Ground from "@/components/Ground";
+import { Particles } from "@/components/Particles";
 import { useBladeShadeStore } from "@/store/bladeShadeStore";
 import CameraController from "@/components/CameraController";
 import { ANIMATION_CONFIG } from "@/config/animation";
@@ -53,6 +54,7 @@ const Scene = () => {
       <Suspense fallback={null}>
         <ShiftStructure />
         <Ground />
+        <Particles />
         <CameraController />
       </Suspense>
     </Canvas>
