@@ -251,24 +251,27 @@ const instancesController = gui
 
 ### STEP 2: サイン波アニメーションをデバッグシーンで完成
 
-**目的**: 各インスタンスが個別のベンド量を持ち、中央から伝播する波を実装
+**目的**: 各インスタンスが個別のベンド量を持ち、要件定義書5.1の通りに中央から伝播する波を実装
 
 #### 2.1 getBendAmount関数の実装
 
 **新規ファイル**: `src/utils/waveAnimation.ts`
 
+**重要な設計方針**:
+- 波の伝播パターンは**固定**（要件定義書5.1に準拠）
+- 遅延調整パラメータ（waveSpeed）は**不要**
+- スクロール進行度のみで伝播を計算
+
 ```typescript
 /**
- * 各ユニットのベンド量を計算（サイン波伝播）
+ * 各ユニットのベンド量を計算（サイン波伝播 - 要件定義書5.1準拠）
  * @param unitIndex ユニットインデックス（0〜50）
  * @param scrollProgress スクロール進行度（0.0〜1.0）
- * @param waveSpeed 波の伝播速度（調整用）
  * @returns ベンド量（0.0〜1.0）
  */
 export const getBendAmount = (
   unitIndex: number,
   scrollProgress: number,
-  waveSpeed: number = 0.05,
 ): number => {
   const centerIndex = 25; // 26本目
   const totalUnits = 51;
@@ -276,58 +279,76 @@ export const getBendAmount = (
 
   if (clampedProgress <= 0.5) {
     // Phase 1: 変形（0% → 50%）
-    // 中央から左右へ伝播
+    // 要件: 中央（26本目）からしなり開始。サイン波で左右（1本目, 51本目）へ伝播
     const phase1Progress = clampedProgress * 2; // 0.0〜1.0に正規化
     const distanceFromCenter = Math.abs(unitIndex - centerIndex);
 
-    // サイン波の位相（中央から離れるほど遅延）
-    const wavePhase = phase1Progress - (distanceFromCenter * waveSpeed);
+    // 固定の伝播パターン: 中央から端まで均等に広がる
+    // 0%で中央開始 → 50%で全ユニット最大湾曲
+    const normalizedDistance = distanceFromCenter / centerIndex; // 0.0〜1.0
+    const wavePhase = phase1Progress - normalizedDistance * 0.5;
 
     // ベンド量を計算（0.0〜1.0）
-    const bendAmount = Math.max(0, Math.min(1, Math.sin(wavePhase * Math.PI * 0.5)));
+    const bendAmount = Math.max(0, Math.min(1, Math.sin(wavePhase * Math.PI)));
 
     return bendAmount;
   } else {
     // Phase 2: 復帰（50% → 100%）
-    // 51本目側から1本目側へ伝播
+    // 要件: B側（51本目側）から復帰開始。サイン波でA側（1本目側）へ伝播
     const phase2Progress = (clampedProgress - 0.5) * 2; // 0.0〜1.0に正規化
     const distanceFromEnd = totalUnits - 1 - unitIndex; // 51本目からの距離
 
-    // サイン波の位相（51本目側から伝播）
-    const wavePhase = phase2Progress - (distanceFromEnd * waveSpeed);
+    // 固定の伝播パターン: 51本目側から1本目側へ均等に戻る
+    const normalizedDistance = distanceFromEnd / (totalUnits - 1); // 0.0〜1.0
+    const wavePhase = phase2Progress - normalizedDistance * 0.5;
 
     // ベンド量を計算（1.0から0.0へ減少）
-    const bendAmount = Math.max(0, Math.min(1, 1 - Math.sin(wavePhase * Math.PI * 0.5)));
+    const bendAmount = Math.max(0, Math.min(1, 1 - Math.sin(wavePhase * Math.PI)));
 
     return bendAmount;
   }
 };
 ```
 
-#### 2.2 InstancedBufferAttribute による個別ベンド量の伝達
+#### 2.2 スクロール乗数（scrollMultiplier）の実装
+
+**新規ファイル**: `src/store/scrollMultiplierStore.ts`
+
+**目的**: アニメーション100%到達に必要な実際のスクロール量を調整可能にする
+
+```typescript
+import { create } from "zustand";
+
+type ScrollMultiplierState = {
+  scrollMultiplier: number;
+  setScrollMultiplier: (value: number) => void;
+};
+
+export const useScrollMultiplierStore = create<ScrollMultiplierState>((set) => ({
+  scrollMultiplier: 1.0, // デフォルト: 1:1対応（100%）
+  setScrollMultiplier: (value) => set({ scrollMultiplier: Math.max(0.5, Math.min(3.0, value)) }),
+}));
+```
+
+**仕様**:
+- **デフォルト値**: 1.0（実スクロール100% = アニメーション100%）
+- **調整範囲**: 0.5 〜 3.0（50% 〜 300%）
+- **効果**:
+  - `scrollMultiplier = 0.5`: 実スクロール50%でアニメーション100%到達
+  - `scrollMultiplier = 2.0`: 実スクロール200%でアニメーション100%到達
+
+#### 2.3 InstancedBufferAttribute による個別ベンド量の伝達
 
 **対象**: `DebugBladeInstances.tsx`
 
 ```typescript
 import { InstancedBufferAttribute } from "three";
 import { getBendAmount } from "@/utils/waveAnimation";
+import { useScrollMultiplierStore } from "@/store/scrollMultiplierStore";
 
-// === Storeに波速度パラメータを追加 ===
-// src/store/waveConfigStore.ts（新規）
-import { create } from "zustand";
-
-type WaveConfigState = {
-  waveSpeed: number;
-  setWaveSpeed: (value: number) => void;
-};
-
-export const useWaveConfigStore = create<WaveConfigState>((set) => ({
-  waveSpeed: 0.05,
-  setWaveSpeed: (value) => set({ waveSpeed: Math.max(0.01, Math.min(0.2, value)) }),
-}));
-
-// === DebugBladeInstances.tsx に追加 ===
-const waveSpeed = useWaveConfigStore((state) => state.waveSpeed);
+// Storeからスクロール乗数を取得
+const scrollMultiplier = useScrollMultiplierStore((state) => state.scrollMultiplier);
+const scrollProgress = useScrollStore((state) => state.progress);
 
 // InstancedBufferAttribute の作成
 const bendAmounts = useMemo(() => {
@@ -349,11 +370,12 @@ useEffect(() => {
 
 // === アニメーション更新（STEP 2: 個別ベンド量） ===
 useFrame(() => {
-  const progress = Math.min(Math.max(scrollProgress, 0), 1);
+  // スクロール進行度をスクロール乗数で調整
+  const adjustedProgress = Math.min(Math.max(scrollProgress * scrollMultiplier, 0), 1);
 
   // 各インスタンスのベンド量を計算
   for (let i = 0; i < TOTAL_UNITS; i++) {
-    const bendAmount = getBendAmount(i, progress, waveSpeed);
+    const bendAmount = getBendAmount(i, adjustedProgress);
     bendAmounts.setX(i, bendAmount);
   }
 
@@ -363,7 +385,9 @@ useFrame(() => {
 });
 ```
 
-#### 2.3 シェーダーの修正
+**重要**: スクロール進行度に `scrollMultiplier` を乗算することで、アニメーション速度を調整します。
+
+#### 2.4 シェーダーの修正
 
 **対象**: `src/shaders/bladeDebugVertex.glsl`
 
@@ -389,37 +413,42 @@ void main() {
 }
 ```
 
-#### 2.4 GUI コントロールの拡張
+#### 2.5 GUI コントロールの拡張
 
 **対象**: `BladeDebugControls.tsx`
 
 ```typescript
-import { useWaveConfigStore } from "@/store/waveConfigStore";
+import { useScrollMultiplierStore } from "@/store/scrollMultiplierStore";
 
-const waveSpeed = useWaveConfigStore((state) => state.waveSpeed);
-const setWaveSpeed = useWaveConfigStore((state) => state.setWaveSpeed);
+const scrollMultiplier = useScrollMultiplierStore((state) => state.scrollMultiplier);
+const setScrollMultiplier = useScrollMultiplierStore((state) => state.setScrollMultiplier);
 
 // GUIパラメータに追加
 const guiParamsRef = useRef({
   // ... 既存のパラメータ ...
-  waveSpeed: 0.05,
+  scrollMultiplier: 1.0,
 });
 
 // GUIフォルダーに追加
-const waveFolder = gui.addFolder("Wave Animation");
+const animationFolder = gui.addFolder("Animation Control");
 
-const waveSpeedController = waveFolder
-  .add(params, "waveSpeed", 0.01, 0.2, 0.01)
-  .name("Wave Speed")
+const scrollMultiplierController = animationFolder
+  .add(params, "scrollMultiplier", 0.5, 3.0, 0.1)
+  .name("Scroll Multiplier")
   .onChange((value: number) => {
-    guiParamsRef.current.waveSpeed = value;
-    setWaveSpeed(value);
+    guiParamsRef.current.scrollMultiplier = value;
+    setScrollMultiplier(value);
   });
 
-waveFolder.open();
+animationFolder.open();
 ```
 
-#### 2.5 カメラ調整（全体俯瞰）
+**説明**:
+- `scrollMultiplier = 0.5`: アニメーションが2倍速（実スクロール50%で完了）
+- `scrollMultiplier = 1.0`: 通常速度（実スクロール100%で完了）
+- `scrollMultiplier = 2.0`: アニメーションが半分速（実スクロール200%で完了）
+
+#### 2.6 カメラ調整（全体俯瞰）
 
 **対象**: `src/components/BladeDebugScene/index.tsx`
 
@@ -463,13 +492,15 @@ const camera51Config = useMemo(() => {
 />
 ```
 
-#### 2.6 検証項目
+#### 2.7 検証項目
 
 **STEP 2 完了の基準**:
-- [ ] 中央（26本目）から波が伝播する
+- [ ] 中央（26本目）から波が伝播する（要件定義書5.1準拠）
 - [ ] 0%→50%: 中央から左右へ広がる
 - [ ] 50%→100%: 51本目側から1本目側へ戻る
-- [ ] 波の速度をGUIで調整できる
+- [ ] スクロール乗数（scrollMultiplier）をGUIで調整できる
+- [ ] scrollMultiplier = 0.5で実スクロール50%時にアニメーション完了
+- [ ] scrollMultiplier = 2.0で実スクロール200%時にアニメーション完了
 - [ ] すべての羽板が滑らかに動く
 - [ ] 陰影が各インスタンスで正しく表示される
 - [ ] FPSが60fps以上を維持
@@ -610,34 +641,36 @@ import { DEBUG_MODE } from "@/config/debug";
 
 #### 2.1 波動計算ロジック
 - [ ] `waveAnimation.ts` 作成
-- [ ] `getBendAmount` 関数実装
-- [ ] Phase 1（中央→左右）の実装
-- [ ] Phase 2（51本目→1本目）の実装
+- [ ] `getBendAmount` 関数実装（要件定義書5.1準拠）
+- [ ] Phase 1（中央→左右）の実装（固定パターン）
+- [ ] Phase 2（51本目→1本目）の実装（固定パターン）
 
-#### 2.2 InstancedBufferAttribute
+#### 2.2 スクロール乗数機能
+- [ ] `scrollMultiplierStore.ts` 作成
+- [ ] `scrollMultiplier` パラメータ管理（0.5〜3.0）
+- [ ] デフォルト値1.0の設定
+
+#### 2.3 InstancedBufferAttribute
 - [ ] `aBendAmount` attribute作成
 - [ ] ジオメトリへの追加
 - [ ] 毎フレーム更新処理
-
-#### 2.3 Zustand Store
-- [ ] `waveConfigStore.ts` 作成
-- [ ] `waveSpeed` パラメータ管理
+- [ ] scrollMultiplierの適用
 
 #### 2.4 シェーダー修正
 - [ ] `aBendAmount` attributeの受け取り
 - [ ] 既存の `uBendAmount` から切り替え
 
 #### 2.5 GUI拡張
-- [ ] Wave Animationフォルダー追加
-- [ ] Wave Speedスライダー実装
+- [ ] Animation Controlフォルダー追加
+- [ ] Scroll Multiplierスライダー実装（0.5〜3.0）
 
 #### 2.6 カメラ調整
 - [ ] 51本全体が見える視点設定
 - [ ] OrbitControls調整
 
 #### 2.7 検証
-- [ ] 波の伝播確認
-- [ ] 速度調整確認
+- [ ] 波の伝播確認（要件定義書5.1通り）
+- [ ] scrollMultiplier調整確認
 - [ ] 滑らかさ確認
 - [ ] FPS維持確認
 
@@ -711,23 +744,34 @@ void main() {
 }
 ```
 
-### サイン波計算の数式
+### サイン波計算の数式（要件定義書5.1準拠）
 
-**Phase 1（0% → 50%）**:
+**重要**: 波の伝播パターンは固定です。遅延パラメータ（waveSpeed）は使用しません。
+
+**Phase 1（0% → 50%）: 中央から左右へ伝播**
 ```
-phase1Progress = scrollProgress * 2  // 0.0〜1.0
+adjustedProgress = scrollProgress * scrollMultiplier  // スクロール乗数の適用
+phase1Progress = adjustedProgress * 2  // 0.0〜1.0に正規化
 distanceFromCenter = |unitIndex - 25|
-wavePhase = phase1Progress - (distanceFromCenter * waveSpeed)
-bendAmount = sin(wavePhase * π / 2)  // 0.0〜1.0にクランプ
+normalizedDistance = distanceFromCenter / 25  // 0.0〜1.0
+wavePhase = phase1Progress - (normalizedDistance * 0.5)  // 固定の伝播係数
+bendAmount = sin(wavePhase * π)  // 0.0〜1.0にクランプ
 ```
 
-**Phase 2（50% → 100%）**:
+**Phase 2（50% → 100%）: 51本目側から1本目側へ伝播**
 ```
-phase2Progress = (scrollProgress - 0.5) * 2  // 0.0〜1.0
+adjustedProgress = scrollProgress * scrollMultiplier  // スクロール乗数の適用
+phase2Progress = (adjustedProgress - 0.5) * 2  // 0.0〜1.0に正規化
 distanceFromEnd = 50 - unitIndex
-wavePhase = phase2Progress - (distanceFromEnd * waveSpeed)
-bendAmount = 1.0 - sin(wavePhase * π / 2)  // 1.0〜0.0にクランプ
+normalizedDistance = distanceFromEnd / 50  // 0.0〜1.0
+wavePhase = phase2Progress - (normalizedDistance * 0.5)  // 固定の伝播係数
+bendAmount = 1.0 - sin(wavePhase * π)  // 1.0〜0.0にクランプ
 ```
+
+**スクロール乗数の効果**:
+- `scrollMultiplier = 0.5`: 実スクロール50%でアニメーション100%到達
+- `scrollMultiplier = 1.0`: 実スクロール100%でアニメーション100%到達（デフォルト）
+- `scrollMultiplier = 2.0`: 実スクロール200%でアニメーション100%到達
 
 ---
 
@@ -740,9 +784,10 @@ bendAmount = 1.0 - sin(wavePhase * π / 2)  // 1.0〜0.0にクランプ
 - デバッグツールがすべて機能する
 
 ### STEP 2完了時
-- 中央から波が広がる様子が観察できる
-- 戻りの波も自然に動く
-- GUIで波速度を調整できる
+- 中央から波が広がる様子が観察できる（要件定義書5.1準拠）
+- 戻りの波も自然に動く（51本目側→1本目側）
+- GUIでスクロール乗数を調整できる
+- スクロール量を変更してもアニメーションパターンは固定
 - 全体の動きが仕様通りになる
 
 ### STEP 3完了時
@@ -793,9 +838,10 @@ bendAmount = 1.0 - sin(wavePhase * π / 2)  // 1.0〜0.0にクランプ
 - スペキュラー計算を無効化してテスト
 
 **問題**: 波が期待通りに伝播しない
-- `waveSpeed` を調整（0.05 → 0.1）
+- `getBendAmount` 関数の計算式を確認
 - デバッグモードで1本ずつ確認
 - console.log で bendAmount 値を確認
+- 要件定義書5.1の動きと比較
 
 **問題**: 影が正しく表示されない
 - `customDepthMaterial` が設定されているか確認
@@ -869,6 +915,7 @@ bendAmount = 1.0 - sin(wavePhase * π / 2)  // 1.0〜0.0にクランプ
 
 #### 次のステップ
 STEP 2: サイン波アニメーションの実装
-- `waveAnimation.ts` と `getBendAmount` 関数の実装
+- `waveAnimation.ts` と `getBendAmount` 関数の実装（要件定義書5.1準拠）
 - InstancedBufferAttributeによる個別ベンド量の適用
-- GUIでの波速度調整機能の追加
+- `scrollMultiplierStore.ts` の作成
+- GUIでのスクロール乗数調整機能の追加（0.5〜3.0）

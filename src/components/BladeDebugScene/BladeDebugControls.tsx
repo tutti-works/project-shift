@@ -4,6 +4,7 @@ import { GUI } from "lil-gui";
 import { useBladeConfigStore } from "@/store/bladeConfigStore";
 import { useRibbonConfigStore } from "@/store/ribbonConfigStore";
 import { useBladeShadeStore } from "@/store/bladeShadeStore";
+import { useWaveConfigStore } from "@/store/waveConfigStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { degToRad, radToDeg } from "./utils";
 
@@ -48,6 +49,8 @@ const BladeDebugControls = ({
   const setAmbientIntensity = useBladeShadeStore((state) => state.setAmbientIntensity);
   const setSpecularIntensity = useBladeShadeStore((state) => state.setSpecularIntensity);
   const setSpecularPower = useBladeShadeStore((state) => state.setSpecularPower);
+  const waveSpeed = useWaveConfigStore((state) => state.waveSpeed);
+  const setWaveSpeed = useWaveConfigStore((state) => state.setWaveSpeed);
 
   const guiRef = useRef<GUI | null>(null);
   const guiParamsRef = useRef({
@@ -63,6 +66,7 @@ const BladeDebugControls = ({
     showAxes,
     showShadowHelper,
     use51Instances,
+    waveSpeed,
   });
   const guiControllersRef = useRef<{
     wireThickness?: DebugController;
@@ -77,6 +81,7 @@ const BladeDebugControls = ({
     showAxes?: DebugController;
     showShadowHelper?: DebugController;
     use51Instances?: DebugController;
+    waveSpeed?: DebugController;
   }>({});
 
   useEffect(() => {
@@ -99,6 +104,7 @@ const BladeDebugControls = ({
     params.showNormals = showNormals;
     params.showAxes = showAxes;
     params.showShadowHelper = showShadowHelper;
+    params.waveSpeed = useWaveConfigStore.getState().waveSpeed;
     params.use51Instances = use51Instances;
 
     const wireController = gui
@@ -202,6 +208,17 @@ const BladeDebugControls = ({
         onToggle51Instances(value);
       });
 
+    const waveFolder = gui.addFolder("Wave Animation");
+
+    const waveSpeedController = waveFolder
+      .add(params, "waveSpeed", 0.01, 0.2, 0.01)
+      .name("Wave Speed")
+      .onChange((value: number) => {
+        guiParamsRef.current.waveSpeed = value;
+        setWaveSpeed(value);
+      });
+
+    waveFolder.open();
     lightingFolder.open();
 
     guiControllersRef.current = {
@@ -217,6 +234,7 @@ const BladeDebugControls = ({
       showAxes: showAxesController,
       showShadowHelper: showShadowHelperController,
       use51Instances: instancesController,
+      waveSpeed: waveSpeedController,
     };
 
     gui.domElement.style.zIndex = "20";
@@ -285,6 +303,11 @@ const BladeDebugControls = ({
     guiParamsRef.current.use51Instances = use51Instances;
     updateDisplay(guiControllersRef.current.use51Instances);
   }, [use51Instances]);
+
+  useEffect(() => {
+    guiParamsRef.current.waveSpeed = waveSpeed;
+    updateDisplay(guiControllersRef.current.waveSpeed);
+  }, [waveSpeed]);
 
   return null;
 };

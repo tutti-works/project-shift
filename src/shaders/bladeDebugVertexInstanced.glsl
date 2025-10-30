@@ -1,6 +1,6 @@
 uniform float uHeight;
-uniform float uBendAmount;
 uniform float uMaxBendAngle;
+attribute float aBendAmount;
 
 varying vec2 vUv;
 varying vec3 vWorldNormal;
@@ -9,7 +9,7 @@ varying vec3 vWorldPosition;
 void main() {
   vUv = uv;
 
-  float bendAmount = clamp(uBendAmount, 0.0, 1.0);
+  float bendAmount = clamp(aBendAmount, 0.0, 1.0);
   float theta = uMaxBendAngle * bendAmount;
   vec3 transformed = position;
 

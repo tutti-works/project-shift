@@ -40,6 +40,20 @@ const BladeDebugScene = () => {
     () => [0, bladeHeight * 0.5, 0] as const,
     [bladeHeight],
   );
+  const camera51Config = useMemo(() => {
+    if (!use51Instances) {
+      return null;
+    }
+
+    const totalWidth = toSceneUnits(51 * 120);
+    const distance = Math.max(totalWidth * 0.8, bladeHeight * 2.5);
+    const height = bladeHeight * 0.75;
+
+    return {
+      position: [0, height, distance] as const,
+      target: [0, bladeHeight * 0.5, 0] as const,
+    };
+  }, [bladeHeight, use51Instances]);
 
   return (
     <>
@@ -58,14 +72,25 @@ const BladeDebugScene = () => {
       <Canvas
         className="h-full w-full"
         shadows
-        camera={{
-          position: [0, cameraHeight, cameraDistance],
-          fov: 40,
-          near: 0.1,
-          far: 100,
-        }}
+        camera={
+          use51Instances && camera51Config
+            ? {
+                position: camera51Config.position,
+                fov: 50,
+                near: 0.1,
+                far: 200,
+              }
+            : {
+                position: [0, cameraHeight, cameraDistance],
+                fov: 40,
+                near: 0.1,
+                far: 100,
+              }
+        }
         onCreated={({ camera }) => {
-          camera.lookAt(...orbitTarget);
+          const target =
+            use51Instances && camera51Config ? camera51Config.target : orbitTarget;
+          camera.lookAt(...target);
         }}
       >
         <color attach="background" args={["#050505"]} />
@@ -90,7 +115,9 @@ const BladeDebugScene = () => {
           enablePan={false}
           enableDamping
           enableZoom={false}
-          target={orbitTarget}
+          target={
+            use51Instances && camera51Config ? camera51Config.target : orbitTarget
+          }
           maxPolarAngle={Math.PI * 0.9}
           minPolarAngle={0}
         />

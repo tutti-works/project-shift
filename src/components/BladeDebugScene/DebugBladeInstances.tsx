@@ -1,4 +1,4 @@
-import {
+﻿import {
   MutableRefObject,
   useCallback,
   useEffect,
@@ -11,6 +11,7 @@ import {
   Color,
   DirectionalLight,
   DoubleSide,
+  InstancedBufferAttribute,
   InstancedMesh,
   MeshDepthMaterial,
   MeshDistanceMaterial,
@@ -22,16 +23,18 @@ import {
 } from "three";
 import { useBladeShadeStore } from "@/store/bladeShadeStore";
 import { useScrollStore } from "@/store/scrollStore";
+import { useWaveConfigStore } from "@/store/waveConfigStore";
 import { ANIMATION_CONFIG } from "@/config/animation";
 import { toSceneUnits } from "@/utils/geometryHelpers";
+import { getBendAmount } from "@/utils/waveAnimation";
 import bladeDebugVertexShader from "@/shaders/bladeDebugVertexInstanced.glsl";
 import bladeFragmentShader from "@/shaders/bladeFragment.glsl";
 import { useBladeGeometry } from "./useBladeGeometry";
 import { clamp01 } from "./utils";
 
 const TOTAL_UNITS = 51;
-const CENTER_INDEX = 25; // 26本目（0-indexed）
-const UNIT_PITCH_MM = 120; // 100mm幅 + 20mm隙間
+const CENTER_INDEX = 25; // 26th unit (0-indexed)
+const UNIT_PITCH_MM = 120; // 100 mm width + 20 mm gap
 const USE_CUSTOM_SHADOW = true;
 
 type DebugBladeInstancesProps = {
@@ -56,11 +59,16 @@ const DebugBladeInstances = ({
   const specularIntensity = useBladeShadeStore((state) => state.specularIntensity);
   const specularPower = useBladeShadeStore((state) => state.specularPower);
   const scrollProgress = useScrollStore((state) => state.progress);
+  const waveSpeed = useWaveConfigStore((state) => state.waveSpeed);
+  const bendAmounts = useMemo(
+    () => new InstancedBufferAttribute(new Float32Array(TOTAL_UNITS), 1),
+    [],
+  );
 
   const bendChunk = useMemo(
     () =>
       `
-        float bendAmount = clamp(uBendAmount, 0.0, 1.0);
+        float bendAmount = clamp(aBendAmount, 0.0, 1.0);
         float theta = uMaxBendAngle * bendAmount;
         if (theta > 0.0001) {
           float normalizedY = clamp((transformed.y + (uHeight * 0.5)) / uHeight, 0.0, 1.0);
@@ -82,13 +90,22 @@ const DebugBladeInstances = ({
     [geometry],
   );
 
+  useEffect(() => {
+    geometry.setAttribute("aBendAmount", bendAmounts);
+
+    return () => {
+      if (geometry.getAttribute("aBendAmount") === bendAmounts) {
+        geometry.deleteAttribute("aBendAmount");
+      }
+    };
+  }, [geometry, bendAmounts]);
+
   const material = useMemo(() => {
     const currentShade = useBladeShadeStore.getState();
     return new ShaderMaterial({
       uniforms: {
         uColor: { value: new Color(ANIMATION_CONFIG.blade.color) },
         uHeight: { value: toSceneUnits(ANIMATION_CONFIG.blade.height) },
-        uBendAmount: { value: 0 },
         uMaxBendAngle: { value: ANIMATION_CONFIG.blade.maxBendAngle },
         uAmbientColor: { value: new Color("#ffffff") },
         uAmbientIntensity: { value: currentShade.ambientIntensity },
@@ -132,14 +149,13 @@ const DebugBladeInstances = ({
       const sharedUniforms = sharedUniformsRef.current;
 
       shader.uniforms.uHeight = sharedUniforms.uHeight;
-      shader.uniforms.uBendAmount = sharedUniforms.uBendAmount;
       shader.uniforms.uMaxBendAngle = sharedUniforms.uMaxBendAngle;
 
       shader.vertexShader = shader.vertexShader.replace(
         /#include\s*<common>/,
         `#include <common>
+attribute float aBendAmount;
 uniform float uHeight;
-uniform float uBendAmount;
 uniform float uMaxBendAngle;`,
       );
 
@@ -265,11 +281,19 @@ ${bendChunkForShader}
     }
 
     const progress = clamp01(scrollProgress);
-    const normalized = progress <= 0.5 ? progress / 0.5 : 1 - (progress - 0.5) / 0.5;
-    const eased = 0.5 - 0.5 * Math.cos(Math.PI * normalized);
+    let centerBend = 0;
+
+    for (let i = 0; i < TOTAL_UNITS; i++) {
+      const bendAmount = getBendAmount(i, progress, waveSpeed);
+      bendAmounts.setX(i, bendAmount);
+      if (i === CENTER_INDEX) {
+        centerBend = bendAmount;
+      }
+    }
+
+    bendAmounts.needsUpdate = true;
 
     const uniforms = sharedUniformsRef.current;
-    uniforms.uBendAmount.value = eased;
 
     const light = lightRef.current;
     if (light) {
@@ -287,7 +311,7 @@ ${bendChunkForShader}
     uniforms.uSpecularPower.value = specularPower;
 
     materialInstance.uniformsNeedUpdate = true;
-    bendAmountRef.current = eased;
+    bendAmountRef.current = centerBend;
   });
 
   return (
@@ -304,3 +328,6 @@ ${bendChunkForShader}
 };
 
 export default DebugBladeInstances;
+
+
+
