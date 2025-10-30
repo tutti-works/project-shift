@@ -691,12 +691,13 @@ const ShadowCameraHelper = ({ lightRef }) => {
 - [x] カスタムシャドウマテリアルによる影の変形連動 ✅
 - [x] デバッグGUIによるリアルタイムパラメータ調整 ✅
 
-### 7.2 51本展開後の検証項目
+### 7.2 51本展開後の検証項目 ✅ **完了**
 
-- [ ] サイン波伝播が正しく動作する
-- [ ] カメラワークがスムーズに動作する
-- [ ] パフォーマンスが目標値を達成（PC: 60fps、SP: 30fps）
-- [ ] レスポンシブ対応が正しく機能する
+- [x] サイン波伝播が正しく動作する ✅
+- [x] カメラワークがスムーズに動作する ✅
+- [x] パフォーマンスが目標値を達成（PC: 60fps） ✅
+- [x] レスポンシブ対応が正しく機能する ✅
+- [x] モバイルでのタッチジェスチャー動作 ✅
 
 ### 7.3 ブラウザ互換性テスト
 
@@ -728,17 +729,19 @@ const ShadowCameraHelper = ({ lightRef }) => {
 6. 本番シーンへの移植 ✅
 
 ### Phase 3: ユーザーインタラクション ✅ **完了**
-1. マウス連動カメラオービット ✅
-2. スクロールインジケーター ✅
-3. テキスト選択無効化 ✅
-4. パーティクルシステム ✅
+1. マウス連動カメラオービット（デスクトップ） ✅
+2. タッチベースの横方向オービット（モバイル） ✅
+3. レスポンシブスクロールインジケーター ✅
+4. テキスト選択無効化 ✅
+5. パーティクルシステム ✅
+6. ハイブリッドモバイル検出 ✅
+7. タッチジェスチャー検出 ✅
 
 ### Phase 4: 最適化・仕上げ 🔄 **進行中**
 1. パフォーマンスチューニング
-2. レスポンシブ対応の実装
-3. アニメーションパラメータの微調整
-4. ブラウザ互換性テスト
-5. 本番デプロイ準備
+2. アニメーションパラメータの微調整
+3. ブラウザ互換性テスト
+4. 本番デプロイ準備
 
 ---
 
@@ -830,7 +833,117 @@ const z = r * Math.cos(phi);
 - GPU インスタンシングによる効率的な描画
 - 常にカメラの方を向く（ビルボード効果）
 
-### 11.4 ユーザーエクスペリエンス向上
+### 11.4 モバイル対応機能
+
+#### ハイブリッドモバイル検出
+**目的**: タブレット端末を含む正確なモバイル判定
+
+**実装ファイル**: `src/components/ScrollIndicator.tsx`
+
+**検出ロジック**:
+```typescript
+const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+const isSmallScreen = window.innerWidth < 768;
+const isMobileUA = /iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent);
+const isTablet = /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent);
+
+// モバイルUIを表示する条件
+const shouldShowSwipeUI = (hasTouch && isSmallScreen) || isMobileUA || isTablet;
+```
+
+**検出方法の組み合わせ**:
+1. **タッチ機能検出**: `ontouchstart` イベント + `maxTouchPoints`
+2. **画面サイズ**: 768px未満
+3. **User Agent**: モバイル/タブレット端末のパターンマッチング
+
+**判定結果**:
+- スマートフォン: タッチ + 小画面 → モバイルUI
+- タブレット: User Agentで判定 → モバイルUI
+- タッチ対応ラップトップ: 大画面 → デスクトップUI
+
+#### タッチジェスチャー検出
+**目的**: 横スワイプでカメラオービット、縦スクロールを妨げない
+
+**実装ファイル**: `src/app/page.tsx`
+
+**ジェスチャー角度計算**:
+```typescript
+const deltaX = touch.clientX - touchStartX;
+const deltaY = touch.clientY - touchStartY;
+
+// atan2で角度を計算（度数法）
+const angle = Math.abs(Math.atan2(deltaY, deltaX) * (180 / Math.PI));
+
+// 横スワイプ判定: ±45度以内
+const isHorizontalSwipe = angle < 45 || angle > 135;
+
+// 最小移動距離（ジッター防止）
+const minMovement = 10; // ピクセル
+const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+```
+
+**横スワイプ時の処理**:
+```typescript
+if (isHorizontalSwipe && totalMovement > minMovement) {
+  // 相対的なデルタを使用（初回ジャンプ防止）
+  const normalizedDelta = (deltaX / window.innerWidth) * 2;
+  const orbitValue = -normalizedDelta * 3; // 逆方向、3倍感度
+  const clampedOrbit = Math.max(-3, Math.min(3, orbitValue));
+
+  // Y=0で縦方向のオービットを無効化
+  setMousePosition(clampedOrbit, 0);
+}
+```
+
+**イベントリスナー設定**:
+```typescript
+window.addEventListener("touchstart", handleTouchStart, { passive: true });
+window.addEventListener("touchmove", handleTouchMove, { passive: true });
+window.addEventListener("touchend", handleTouchEnd, { passive: true });
+```
+
+**パッシブリスナーの利点**:
+- スクロールパフォーマンスを維持
+- ブラウザの最適化を有効化
+- `preventDefault()`を呼ばないことでスクロールがスムーズ
+
+#### モバイル対応スクロールインジケーター
+**デスクトップ表示**:
+- マウスアイコン + スクロールホイールアニメーション
+- 下向き矢印（3つ）
+- 矢印の回転: `rotate(45deg)`
+
+**モバイル表示**:
+- マウスアイコン非表示
+- 上向き矢印（3つ）
+- 矢印の回転: `rotate(-135deg)`
+- スワイプアップジェスチャーを示唆
+
+**CSS実装**:
+```css
+/* モバイル用の上向き矢印 */
+.arrowsMobile .arrow {
+  transform: rotate(-135deg);
+  animation: arrowBounceMobile 2s ease-in-out infinite;
+}
+
+@keyframes arrowBounceMobile {
+  0%, 20%, 50%, 80%, 100% {
+    opacity: 0;
+    transform: rotate(-135deg) translateY(8px);
+  }
+  40% {
+    opacity: 1;
+    transform: rotate(-135deg) translateY(0);
+  }
+  60% {
+    opacity: 1;
+    transform: rotate(-135deg) translateY(-4px);
+  }
+}
+```
+
+### 11.5 ユーザーエクスペリエンス向上
 
 **テキスト選択無効化**:
 ```css

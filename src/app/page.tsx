@@ -23,6 +23,10 @@ const Home = () => {
     (state) => state.scrollMultiplier,
   );
   const setMousePosition = useMouseStore((state) => state.setMousePosition);
+  const setTouchStart = useMouseStore((state) => state.setTouchStart);
+  const setTouchEnd = useMouseStore((state) => state.setTouchEnd);
+  const touchStartX = useMouseStore((state) => state.touchStartX);
+  const touchStartY = useMouseStore((state) => state.touchStartY);
 
   // Track mouse position for camera orbit effect
   useEffect(() => {
@@ -38,6 +42,64 @@ const Home = () => {
       window.removeEventListener("mousemove", handleMouseMove);
     };
   }, [setMousePosition]);
+
+  // Track touch position for horizontal orbit on mobile
+  useEffect(() => {
+    const handleTouchStart = (event: TouchEvent) => {
+      if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        setTouchStart(touch.clientX, touch.clientY);
+        // Don't change camera position on touch start
+      }
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        const deltaX = touch.clientX - touchStartX;
+        const deltaY = touch.clientY - touchStartY;
+
+        // Calculate gesture angle
+        const angle = Math.abs(Math.atan2(deltaY, deltaX) * (180 / Math.PI));
+
+        // Horizontal swipe detection: angle close to 0° or 180° (±45°)
+        const isHorizontalSwipe = angle < 45 || angle > 135;
+
+        // Minimum movement threshold to avoid jitter
+        const minMovement = 10;
+        const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        if (isHorizontalSwipe && totalMovement > minMovement) {
+          // Use relative delta from touch start, not absolute position
+          // Normalize delta to -1 to 1 range based on screen width
+          const normalizedDelta = (deltaX / window.innerWidth) * 2;
+          // Invert direction and increase sensitivity (3x)
+          const orbitValue = -normalizedDelta * 3;
+          // Clamp to reasonable range (-3 to 3 allows ±30 degrees)
+          const clampedOrbit = Math.max(-3, Math.min(3, orbitValue));
+
+          // Keep Y at 0 to disable vertical orbit on mobile
+          setMousePosition(clampedOrbit, 0);
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      setTouchEnd();
+      // Reset to neutral position when touch ends
+      setMousePosition(0, 0);
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [setTouchStart, setTouchEnd, setMousePosition, touchStartX, touchStartY]);
 
   // Hide the scrollbar in the production scene
   useEffect(() => {

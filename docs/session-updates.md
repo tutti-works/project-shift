@@ -56,6 +56,64 @@
   const verticalAngle = -smoothMouseY.current * (5 * Math.PI / 180);
   ```
 
+#### 1.4 モバイル対応スクロールインジケーター
+- **ファイル**:
+  - `src/components/ScrollIndicator.tsx`
+  - `src/components/ScrollIndicator.module.css`
+- **機能**:
+  - **ハイブリッドモバイル検出**:
+    ```typescript
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isSmallScreen = window.innerWidth < 768;
+    const isMobileUA = /iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent);
+    const isTablet = /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent);
+    const shouldShowSwipeUI = (hasTouch && isSmallScreen) || isMobileUA || isTablet;
+    ```
+  - **デスクトップ**: マウスアイコン + 下向き矢印（3つ）
+  - **モバイル/タブレット**: 上向き矢印のみ（3つ、スワイプジェスチャーを示唆）
+  - **アニメーション**:
+    - デスクトップ: `rotate(45deg)` - 下方向へバウンス
+    - モバイル: `rotate(-135deg)` - 上方向へバウンス（スワイプアップを促す）
+
+#### 1.5 タッチベースの横方向オービット
+- **ファイル**:
+  - `src/store/mouseStore.ts` (拡張)
+  - `src/app/page.tsx` (タッチイベント追加)
+- **機能**:
+  - モバイルデバイスでの横方向カメラオービット
+  - ジェスチャー角度検出（±45°で横スワイプと判定）
+  - 縦スクロールとの共存（縦スクロールを妨げない）
+- **実装詳細**:
+  ```typescript
+  // ジェスチャー角度の計算
+  const angle = Math.abs(Math.atan2(deltaY, deltaX) * (180 / Math.PI));
+  const isHorizontalSwipe = angle < 45 || angle > 135;
+  const minMovement = 10; // 最小移動距離（ピクセル）
+
+  // 横スワイプのみ処理
+  if (isHorizontalSwipe && totalMovement > minMovement) {
+    const deltaX = touch.clientX - touchStartX;
+    const normalizedDelta = (deltaX / window.innerWidth) * 2;
+    const orbitValue = -normalizedDelta * 3; // 逆方向、3倍感度
+    const clampedOrbit = Math.max(-3, Math.min(3, orbitValue));
+    setMousePosition(clampedOrbit, 0); // Y=0（縦方向なし）
+  }
+  ```
+- **パラメータ**:
+  - 方向: 逆方向（デスクトップと同じ）
+  - 感度: 3倍（通常の3倍速で反応）
+  - 範囲: ±3（クランプ）
+  - イージング: デスクトップと同じ係数（0.05）
+  - パッシブリスナー: スクロールパフォーマンスを維持
+- **touchStore状態**:
+  ```typescript
+  touchStartX: number;
+  touchStartY: number;
+  isTouching: boolean;
+  setTouchStart: (x: number, y: number) => void;
+  setTouchEnd: () => void;
+  ```
+
 ### 2. パーティクルシステム
 
 #### 2.1 パーティクルの実装
@@ -218,8 +276,8 @@
 ### 機能拡張
 1. パーティクルアニメーション（回転、浮遊、フェード）
 2. スクロールに応じたパーティクルの動き
-3. モバイルデバイスでのタッチ対応カメラオービット
-4. パーティクルの色やサイズのバリエーション
+3. パーティクルの色やサイズのバリエーション
+4. タッチジェスチャーの拡張（ピンチズーム、スワイプナビゲーション）
 
 ### パフォーマンス
 1. パーティクルのLOD（距離に応じた描画数調整）
@@ -250,19 +308,27 @@
 
 このセッションでは、以下を達成しました：
 
-1. **3つの新機能**を実装
-   - スクロールインジケーター
-   - マウス連動カメラオービット
-   - パーティクルシステム
+1. **5つの新機能**を実装
+   - マウス連動カメラオービット（デスクトップ）
+   - レスポンシブスクロールインジケーター（デスクトップ/モバイル対応）
+   - タッチベースの横方向オービット（モバイル）
+   - パーティクルシステム（中空球体配置）
+   - テキスト選択無効化
 
-2. **ビルドシステムを改善**
+2. **モバイル対応の強化**
+   - ハイブリッドモバイル検出（タッチAPI + 画面サイズ + User Agent）
+   - タッチジェスチャー検出（角度計算、最小移動距離）
+   - 横スワイプのみのカメラオービット（縦スクロールと共存）
+   - デバイス別UI表示（マウスアイコン/矢印方向）
+
+3. **ビルドシステムを改善**
    - 型チェックスクリプト追加
    - Three.js型定義の修正
    - 19ファイルの型エラー解消
 
-3. **本番ビルド成功**
+4. **本番ビルド成功**
    - バンドルサイズ: 95.1 kB
    - 静的HTML生成
    - デプロイ準備完了
 
-プロジェクトは本番環境へのデプロイ可能な状態です。
+プロジェクトは本番環境へのデプロイ可能な状態で、デスクトップとモバイルの両方で最適化されたユーザー体験を提供します。
