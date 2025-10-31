@@ -10,7 +10,7 @@ export const ANIMATION_CONFIG: AnimationConfig = {
     width: 100,
     height: 3762,
     thickness: 26,
-    color: "#e5bb72",
+    color: "rgba(235, 217, 197, 1)",
     heightSegments: 64,
     maxBendAngle: Math.PI / 2,
   },
