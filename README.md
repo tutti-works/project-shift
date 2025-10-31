@@ -32,7 +32,7 @@
 ```
 src/
 ├── app/              # Next.jsエントリーポイント
-│   ├── page.tsx      # メインページ
+│   ├── page.tsx      # メインページ（固定UI + スクロール制御）
 │   └── layout.tsx    # ルートレイアウト
 ├── components/       # 3Dコンポーネント
 │   ├── Scene.tsx              # R3F Canvasラッパー
@@ -40,22 +40,28 @@ src/
 │   ├── BladeInstances.tsx     # 羽板（InstancedMesh）
 │   ├── RibbonInstances.tsx    # リボン（InstancedMesh）
 │   ├── WireInstances.tsx      # ワイヤー（InstancedMesh）
-│   ├── CameraController.tsx   # カメラ制御
-│   └── ScrollController.tsx   # スクロール制御
+│   ├── Ground.tsx             # 基本的な地面（マットマテリアル）
+│   ├── ReflectorGround.tsx    # 反射地面（カスタムシェーダー）
+│   ├── CameraController.tsx   # カメラ制御 + マウス追従
+│   └── ScrollController.tsx   # スクロール制御（Lenis）
 ├── config/           # 設定ファイル
 │   └── animation.ts  # アニメーションパラメータ（唯一の設定源）
 ├── shaders/          # GLSLシェーダー
-│   ├── bladeVertex.glsl      # 羽板 Vertex Shader
-│   ├── bladeFragment.glsl    # 羽板 Fragment Shader
-│   ├── ribbonVertex.glsl     # リボン Vertex Shader
-│   └── ribbonFragment.glsl   # リボン Fragment Shader
+│   ├── bladeVertex.glsl          # 羽板 Vertex Shader
+│   ├── bladeFragment.glsl        # 羽板 Fragment Shader
+│   ├── ribbonVertex.glsl         # リボン Vertex Shader
+│   ├── ribbonFragment.glsl       # リボン Fragment Shader
+│   ├── reflectorVertex.glsl      # 反射地面 Vertex Shader
+│   └── reflectorFragment.glsl    # 反射地面 Fragment Shader
 ├── store/            # グローバル状態
-│   └── scrollStore.ts        # スクロール状態管理
+│   ├── scrollStore.ts        # スクロール状態管理
+│   └── mouseStore.ts         # マウス位置状態管理
 ├── types/            # TypeScript型定義
 │   └── animation.ts          # アニメーション設定の型
 └── utils/            # ユーティリティ関数
     ├── animationHelpers.ts   # アニメーション計算
-    └── geometryHelpers.ts    # ジオメトリ生成
+    ├── geometryHelpers.ts    # ジオメトリ生成
+    └── cameraHelpers.ts      # カメラ位置計算
 ```
 
 ## 🚀 セットアップ
@@ -110,6 +116,10 @@ npm run lint
 - [x] ライティング設定
 - [x] **カスタムシャドウマテリアル実装（影の変形連動）**
 - [x] **シャドウカメラヘルパー実装（デバッグ・最適化用）**
+- [x] **地面の反射実装（ReflectorGround + カスタムシェーダー）**
+- [x] **マウス追従カメラオービット効果**
+- [x] **UI固定表示（スクロール時も画面上部に固定）**
+- [x] **背景パーティクルシステム**
 - [x] レスポンシブ対応の基本実装
 
 ### ✅ 最近完了した項目
@@ -143,6 +153,43 @@ npm run lint
      - Ribbon Twist (deg, max): リボンの最大曲げ時ねじれ角度（-180〜360度）
    - **ファイル**: [src/components/BladeDebugScene/DebugRibbon.tsx](src/components/BladeDebugScene/DebugRibbon.tsx)
    - **参考**: [docs/ribbon-implementation.md](docs/ribbon-implementation.md) | [docs/shadow-issue.md](docs/shadow-issue.md)
+
+#### 3. **地面の反射実装** ✅ **完了**
+   - **実装内容**:
+     - リアルタイム反射レンダリング（WebGLRenderTarget使用） ✅
+     - カスタムシェーダーによる反射マッピング ✅
+     - 仮想カメラによるミラー空間計算 ✅
+     - Oblique View Frustumによるクリッピング最適化 ✅
+   - **技術的特徴**:
+     - `onBeforeRender`フックで反射テクスチャを毎フレーム更新
+     - テクスチャ行列による投影UV計算
+     - 反射強度: 12%（微妙な反射効果）
+     - 地面色: `rgb(0.3, 0.3, 0.3)`（ダークグレー）
+   - **ファイル**:
+     - [src/components/ReflectorGround.tsx](src/components/ReflectorGround.tsx)
+     - [src/shaders/reflectorVertex.glsl](src/shaders/reflectorVertex.glsl)
+     - [src/shaders/reflectorFragment.glsl](src/shaders/reflectorFragment.glsl)
+
+#### 4. **カメラインタラクション強化** ✅ **完了**
+   - **マウス追従オービット効果**:
+     - 水平方向: ±10度（マウスX位置に応じて）
+     - 垂直方向: ±5度（マウスY位置に応じて）
+     - イージング: 0.05の減衰係数でスムーズな追従
+   - **モバイルジェスチャー対応**:
+     - 水平スワイプでカメラ回転（±30度）
+     - 垂直スクロールは無効化（誤操作防止）
+     - タッチ終了時に中央位置へ自動復帰
+   - **ファイル**: [src/components/CameraController.tsx](src/components/CameraController.tsx)
+
+#### 5. **UI/UX改善** ✅ **完了**
+   - **固定ヘッダーUI**:
+     - タイトル「SHIFT」と作者名を画面上部に固定表示
+     - `fixed inset-0`ポジショニングでスクロール非連動
+     - グラスモーフィズム効果（半透明背景）
+   - **スクロールインジケーター**:
+     - 画面下部に動的なスクロールガイド表示
+     - スクロール進行度に応じてフェードアウト
+   - **ファイル**: [src/app/page.tsx](src/app/page.tsx)
 
 ### 🔄 進行中・調整が必要な項目
 
@@ -299,7 +346,7 @@ Next.jsのHot Reloadはシェーダーファイルに対応していません。
 
 ## 🎨 技術的ハイライト
 
-### カスタムシャドウの実装
+### 1. カスタムシャドウの実装
 
 Three.jsのカスタム頂点シェーダーを使用する際、影を変形に連動させるのは困難な課題でした。この実装では以下の技術的な解決策を採用しています:
 
@@ -310,7 +357,52 @@ Three.jsのカスタム頂点シェーダーを使用する際、影を変形に
 
 詳細なデバッグプロセスと実装については [docs/shadow-issue.md](docs/shadow-issue.md) を参照してください。
 
+### 2. リアルタイム反射システム
+
+地面の反射効果は、Three.jsの標準的なReflectorを参考に、カスタムシェーダーで実装しています:
+
+#### 技術的アプローチ
+- **WebGLRenderTarget**: オフスクリーンレンダリングで反射テクスチャを生成（1024x1024）
+- **仮想カメラ**: メインカメラを地面で反転したミラー空間カメラを計算
+- **Oblique View Frustum**: クリッピング平面を調整して、地面より下のオブジェクトを除外
+- **テクスチャ行列**: 投影座標をUV空間に変換する4x4行列
+
+#### シェーダー実装
+```glsl
+// Vertex Shader
+uniform mat4 textureMatrix;
+varying vec4 vUv;
+
+void main() {
+  vUv = textureMatrix * vec4(position, 1.0);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+
+// Fragment Shader
+vec4 reflectionSample = texture2DProj(tDiffuse, vUv);
+vec3 blended = mix(baseColor, reflectionSample.rgb, textureOpacity);
+```
+
+#### パフォーマンス最適化
+- `onBeforeRender`フックで反射用の追加レンダーパスを実行
+- 反射レンダリング時は地面メッシュを非表示にして無限ループを回避
+- 反射強度を12%に抑えて、変形の違和感を軽減
+
+### 3. インタラクティブカメラ制御
+
+マウス/タッチ入力に応じたカメラオービット効果を実装:
+
+#### 数学的実装
+- **球面座標変換**: カメラ位置を球面座標で表現
+- **回転行列**: 水平（Y軸）・垂直（ピッチ）の2軸回転を適用
+- **イージング**: `lerp`関数で滑らかな移動（減衰係数0.08）
+
+#### ジェスチャー認識（モバイル）
+- タッチ角度計算: `Math.atan2(deltaY, deltaX)` で±45度の閾値判定
+- 水平スワイプのみ反応（垂直スクロールと干渉防止）
+- 最小移動距離10pxで誤検知を回避
+
 ---
 
 **開発状況**: Phase 1 完了（1本のユニットのデバッグモード実装完了）| Phase 2 準備中（51本への拡張）
-**最終更新**: 2025年10月30日
+**最終更新**: 2025年11月1日

@@ -143,14 +143,22 @@ const Home = () => {
         <Scene />
       </div>
 
-      <article style={pageStyle} className="pointer-events-none relative z-10 flex flex-col justify-between">
-        <section className="pointer-events-auto mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 pb-24 pt-32 md:px-10">
+      {/* <article style={pageStyle} className="pointer-events-none relative z-10 flex flex-col justify-between">
+        <section className="pointer-events-auto mx-auto flex w-full max-w-4xl flex-col gap-3 px-6 pb-24 pt-32 md:px-10">
           <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
             SHIFT
           </h1>
+          <h2 className="text-xl font-semibold text-zinc-200">
+            Ryusei Asakawa
+          </h2>
         </section>
+      </article> */}
 
-        <section className="pointer-events-auto mx-auto w-full max-w-4xl space-y-6 px-6 pb-32 md:px-10">
+      <article className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-start">
+        <section className="pointer-events-auto mx-auto flex w-full max-w-4xl flex-col gap-3 px-6 pb-24 pt-20 md:px-10">
+          <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
+            SHIFT
+          </h1>
           <h2 className="text-xl font-semibold text-zinc-200">
             Ryusei Asakawa
           </h2>

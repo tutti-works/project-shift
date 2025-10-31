@@ -12,9 +12,10 @@ const Ground = () => {
     <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <primitive object={geometry} />
       <meshStandardMaterial
-        color="#aaaaaa"
-        metalness={0.5}
-        roughness={0}
+        color="#555555"
+        metalness={0}
+        roughness={0.6}
+        envMapIntensity={1.0}
       />
     </mesh>
   );
