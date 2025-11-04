@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useMemo, useEffect } from "react";
 import ScrollController from "@/components/ScrollController";
 import { ScrollIndicator } from "@/components/ScrollIndicator";
+import { CameraSwitcher } from "@/components/CameraSwitcher";
 import { useScrollMultiplierStore } from "@/store/scrollMultiplierStore";
 import { useMouseStore } from "@/store/mouseStore";
 
@@ -164,6 +165,8 @@ const Home = () => {
           </h2>
         </section>
       </article>
+
+      <CameraSwitcher />
 
       {!USE_DEBUG_SCENE && <ScrollIndicator />}
     </main>

@@ -42,7 +42,8 @@ src/
 │   ├── WireInstances.tsx      # ワイヤー（InstancedMesh）
 │   ├── Ground.tsx             # 基本的な地面（マットマテリアル）
 │   ├── ReflectorGround.tsx    # 反射地面（カスタムシェーダー）
-│   ├── CameraController.tsx   # カメラ制御 + マウス追従
+│   ├── CameraController.tsx   # カメラ制御 + 3モード切り替え
+│   ├── CameraSwitcher.tsx     # カメラモード切り替えUI
 │   └── ScrollController.tsx   # スクロール制御（Lenis）
 ├── config/           # 設定ファイル
 │   └── animation.ts  # アニメーションパラメータ（唯一の設定源）
@@ -55,7 +56,8 @@ src/
 │   └── reflectorFragment.glsl    # 反射地面 Fragment Shader
 ├── store/            # グローバル状態
 │   ├── scrollStore.ts        # スクロール状態管理
-│   └── mouseStore.ts         # マウス位置状態管理
+│   ├── mouseStore.ts         # マウス位置状態管理
+│   └── cameraStore.ts        # カメラモード状態管理
 ├── types/            # TypeScript型定義
 │   └── animation.ts          # アニメーション設定の型
 └── utils/            # ユーティリティ関数
@@ -118,6 +120,7 @@ npm run lint
 - [x] **シャドウカメラヘルパー実装（デバッグ・最適化用）**
 - [x] **地面の反射実装（ReflectorGround + カスタムシェーダー）**
 - [x] **マウス追従カメラオービット効果**
+- [x] **3モードカメラシステム（固定・円弧・ウォークスルー）**
 - [x] **UI固定表示（スクロール時も画面上部に固定）**
 - [x] **背景パーティクルシステム**
 - [x] レスポンシブ対応の基本実装
@@ -190,6 +193,37 @@ npm run lint
      - 画面下部に動的なスクロールガイド表示
      - スクロール進行度に応じてフェードアウト
    - **ファイル**: [src/app/page.tsx](src/app/page.tsx)
+
+#### 6. **3モードカメラシステム** ✅ **完了**
+   - **実装内容**:
+     - 3つのカメラモードを切り替え可能 ✅
+     - 右上にモダンなUIボタン配置 ✅
+     - スムーズなカメラ遷移（イージング） ✅
+   - **カメラモード**:
+     - **カメラ1（Fixed）**: 固定カメラ（初期位置で静止）
+       - 位置: (7.00, 1.76, 6.34)
+       - オービット効果: あり（ターゲット中心）
+     - **カメラ2（Arc）**: 円弧カメラ（スクロール連動）
+       - スクロールに応じて円弧軌道を移動
+       - オービット効果: あり（ターゲット中心）
+     - **カメラ3（Walkthrough）**: ウォークスルーカメラ（1人称視点）
+       - 開始位置: (5.70, 1.61, 1.0) → 終了位置: (-0.70, 1.61, 1.0)
+       - -X方向に直線移動
+       - オービット効果: なし（1人称視点、カーソル追従）
+       - 水平±10度、垂直±5度の視線回転
+   - **UI機能**:
+     - 数字ボタン「1」「2」「3」
+     - ホバー時にツールチップ表示（"Fixed Camera", "Arc Camera", "Walkthrough"）
+     - グラスモーフィズムデザイン（半透明 + backdrop-blur）
+     - デスクトップのみ表示（モバイルは固定カメラのみ）
+   - **イージング設定**:
+     - カメラ位置: lerp係数 0.04（Walkthrough）, 0.02（Fixed/Arc）
+     - マウス追従: lerp係数 0.05
+   - **ファイル**:
+     - [src/store/cameraStore.ts](src/store/cameraStore.ts) - カメラモード状態管理
+     - [src/components/CameraController.tsx](src/components/CameraController.tsx) - カメラ制御ロジック
+     - [src/components/CameraSwitcher.tsx](src/components/CameraSwitcher.tsx) - UI切り替えボタン
+     - [src/utils/cameraHelpers.ts](src/utils/cameraHelpers.ts) - カメラ位置計算
 
 ### 🔄 進行中・調整が必要な項目
 
@@ -405,4 +439,4 @@ vec3 blended = mix(baseColor, reflectionSample.rgb, textureOpacity);
 ---
 
 **開発状況**: Phase 1 完了（1本のユニットのデバッグモード実装完了）| Phase 2 準備中（51本への拡張）
-**最終更新**: 2025年11月1日
+**最終更新**: 2025年11月5日

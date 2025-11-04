@@ -1,6 +1,48 @@
 import { Vector3 } from "three";
 
 /**
+ * 固定カメラの位置（初期位置で固定）
+ */
+export const getCameraPositionFixed = (): Vector3 => {
+  return new Vector3(7.0, 1.76, 6.34);
+};
+
+/**
+ * 固定カメラのターゲット位置
+ */
+export const getCameraTargetFixed = (): Vector3 => {
+  return new Vector3(0, 1.881, 0);
+};
+
+/**
+ * Walkthrough カメラの位置を計算
+ * 開始: (5.70, 1.61, 0.54) → 終了: (-5.70, 1.61, 0.54)
+ * -X方向に直線移動、イージング適用
+ */
+export const getCameraPositionWalkthrough = (progress: number): Vector3 => {
+  const clampedProgress = Math.min(Math.max(progress, 0), 1);
+  // Ease In/Out Smooth (smoothstep)
+  const eased = clampedProgress * clampedProgress * (3 - 2 * clampedProgress);
+
+  const startX = 5.7;
+  const endX = -0.7;
+  const y = 1.61;
+  const z = 1.0;
+
+  const x = startX + (endX - startX) * eased;
+  return new Vector3(x, y, z);
+};
+
+/**
+ * Walkthrough カメラのターゲット位置（-X方向を向く）
+ */
+export const getCameraTargetWalkthrough = (progress: number): Vector3 => {
+  const cameraPos = getCameraPositionWalkthrough(progress);
+  // -X方向を向く（カメラ位置からX軸負の方向）
+  return new Vector3(cameraPos.x - 1, cameraPos.y, cameraPos.z);
+};
+
+/**
  * スクロール進行度に応じたカメラターゲット位置を計算
  * 高さが1.881から0.5へスムーズに移動
  * イージング: Ease In/Out Smooth
