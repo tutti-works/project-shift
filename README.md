@@ -213,7 +213,8 @@ npm run lint
        - 水平±10度、垂直±5度の視線回転
    - **UI機能**:
      - 数字ボタン「1」「2」「3」
-     - ホバー時にツールチップ表示（"Fixed Camera", "Arc Camera", "Walkthrough"）
+     - ホバー時にツールチップ表示（"Fixed View", "Orbit View", "Walkthrough View"）
+     - 選択中のボタンでもホバー時にツールチップ表示 ✅
      - グラスモーフィズムデザイン（半透明 + backdrop-blur）
      - デスクトップのみ表示（モバイルは固定カメラのみ）
    - **イージング設定**:

@@ -10,9 +10,9 @@ interface CameraButton {
 }
 
 const cameras: CameraButton[] = [
-  { mode: "fixed", label: "1", tooltip: "Fixed Camera" },
-  { mode: "arc", label: "2", tooltip: "Arc Camera" },
-  { mode: "walkthrough", label: "3", tooltip: "Walkthrough" },
+  { mode: "fixed", label: "1", tooltip: "Fixed View" },
+  { mode: "arc", label: "2", tooltip: "Orbit View" },
+  { mode: "walkthrough", label: "3", tooltip: "Walkthrough View" },
 ];
 
 export const CameraSwitcher = () => {
@@ -48,7 +48,7 @@ export const CameraSwitcher = () => {
             </button>
 
             {/* Tooltip */}
-            {isHovered && !isActive && (
+            {isHovered && (
               <div className="absolute right-full top-1/2 mr-3 -translate-y-1/2 whitespace-nowrap rounded-md bg-black/90 px-3 py-1.5 text-xs text-white backdrop-blur-sm">
                 {tooltip}
                 <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-black/90" />
